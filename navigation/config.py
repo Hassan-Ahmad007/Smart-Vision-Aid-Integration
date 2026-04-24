@@ -1,9 +1,0 @@
-MAPBOX_TOKEN = "pk.eyJ1IjoiYWhtYXI3ODEiLCJhIjoiY21rZm5jeDdrMDB3aTNlcjBsc2ttbGZwbyJ9.jn9UGXS-BRWEbuwYwuLb3Q"
-
-GPS_MODE = "laptop"   # " or "arduino"
-
-STEP_THRESHOLD = 8  # meters
-CRITICAL_OBS = 50
-OBS_THRESHOLD = 150
-
-COOLDOWN = 2
