@@ -1,5 +1,5 @@
-from utils import distance
-from config import STEP_THRESHOLD
+from navigation.utils import distance
+from navigation.config  import STEP_THRESHOLD
 
 class Tracker:
     def __init__(self, steps):

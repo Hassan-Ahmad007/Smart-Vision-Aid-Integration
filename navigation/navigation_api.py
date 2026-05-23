@@ -1,6 +1,6 @@
 import requests
 import time
-from config import MAPBOX_TOKEN
+from navigation.config import MAPBOX_TOKEN
 
 
 # ----------- GEOCODING -----------

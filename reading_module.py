@@ -6,7 +6,7 @@ import os
 
 # Ensure these helper files are in the same directory
 from imagepreprocessing import preprocess_fast
-from textextractor import extract_and_speak
+from textextractor import extract_text
 
 # TESSERACT PATH (Keep your local path)
 pytesseract.pytesseract.tesseract_cmd = r"C:\Users\hp\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
@@ -41,11 +41,11 @@ class TextScanner:
             return 0.0
 
 
-def run_reading(stop_event, tts_queue):
+def run_reading(stop_event, sva_respond):
     """Refactored Entry Point for the Manager"""
 
     def speak(text):
-        tts_queue.put(text)
+        sva_respond(str(text))
 
     scanner = TextScanner()
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # Using your preferred Index 2
@@ -112,8 +112,20 @@ def run_reading(stop_event, tts_queue):
 
                         # Process logic (inline)
                         processed_image, _ = preprocess_fast(best_roi)
-                        extract_and_speak(best_roi)  # This uses your local script logic
-                        speak("Reading completed. Ready for next scan.")
+                        text = extract_text(best_roi)
+
+                        if text:
+
+                            speak(text)
+
+                            speak("Reading completed. Ready for next scan.")
+
+                        else:
+
+                            speak(
+                                "Unable to read text. "
+                                "Please improve lighting or move closer."
+                            )
                         # Reset for next scan
                         best_conf = 0
                         scanner.perfect_start_time = None

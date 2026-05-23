@@ -4,6 +4,7 @@ import time
 from collections import deque
 
 # --- CONSTANTS ---
+
 VOTE_THRESHOLD = 3
 CONF_THRESH = 0.55
 MAX_OBJECTS = 2
@@ -11,11 +12,12 @@ COOLDOWN_TIME = 7
 TARGET_CLASSES = [0, 1, 2, 3, 5, 7, 9, 13, 15, 16, 17, 18, 19, 56, 57, 58, 59, 60, 61, 62, 63, 72]
 
 
+
 def get_votes(cls, history):
     return sum(1 for f_set in history if cls in f_set)
 
 
-def run_detection(stop_event, tts_queue):
+def run_detection(stop_event, sva_respond):
     model = YOLO("yolov8n.pt")
     cap = cv2.VideoCapture(0)
 
@@ -24,6 +26,7 @@ def run_detection(stop_event, tts_queue):
     detection_history = deque(maxlen=5)
     cooldowns = {}
     raw_detections = []
+    last_announced = None
 
     print("Vision Module Started...")
 
@@ -58,7 +61,10 @@ def run_detection(stop_event, tts_queue):
                 if is_verified:
                     last_spoken = cooldowns.get(cls, 0)
                     if current_time - last_spoken > COOLDOWN_TIME:
-                        tts_queue.put(name + " ahead")
+                        if name != last_announced:
+                            sva_respond(name + " ahead")
+
+                            last_announced = name
                         cooldowns[cls] = current_time
 
                 # Store visual data

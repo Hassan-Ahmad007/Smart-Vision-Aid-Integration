@@ -1,5 +1,5 @@
 import time
-from config import CRITICAL_OBS, OBS_THRESHOLD, COOLDOWN
+from navigation.config  import CRITICAL_OBS, OBS_THRESHOLD, COOLDOWN
 
 class DecisionEngine:
     def __init__(self):

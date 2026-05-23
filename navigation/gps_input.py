@@ -1,7 +1,7 @@
 import asyncio
 import serial
 from winsdk.windows.devices.geolocation import Geolocator
-from config import GPS_MODE
+from navigation.config import GPS_MODE
 
 
 class GPSInput:

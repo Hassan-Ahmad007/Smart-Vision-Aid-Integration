@@ -1,88 +1,65 @@
-# import json
-# import time
-# import sounddevice as sd
-# from vosk import Model, KaldiRecognizer
-
-# MODEL_PATH = "model"
-# SAMPLE_RATE = 16000
-# SILENCE_TIMEOUT = 1.2
-
-# model = Model(MODEL_PATH)
-
-
-# def get_destination():
-#     recognizer = KaldiRecognizer(model, SAMPLE_RATE)
-#     recognizer.SetWords(True)
-
-#     last_speech = time.time()
-#     final_text = ""
-
-#     print("Listening for destination...")
-
-#     with sd.RawInputStream(
-#         samplerate=SAMPLE_RATE,
-#         blocksize=4000,
-#         dtype="int16",
-#         channels=1
-#     ) as stream:
-
-#         while True:
-#             data, _ = stream.read(4000)
-
-#             # IMPORTANT FIX: convert buffer → bytes
-#             if recognizer.AcceptWaveform(bytes(data)):
-#                 result = json.loads(recognizer.Result())
-#                 text = result.get("text", "").strip()
-
-#                 if text:
-#                     final_text = text
-#                     last_speech = time.time()
-#             else:
-#                 partial = json.loads(recognizer.PartialResult()).get("partial", "")
-#                 if partial:
-#                     last_speech = time.time()
-
-#             # silence detection
-#             if final_text and (time.time() - last_speech > SILENCE_TIMEOUT):
-#                 return final_text
-
-#             # safety escape
-#             if time.time() - last_speech > 10 and final_text:
-#                 # return final_text
-
-
 import speech_recognition as sr
-from voice_output import speak
+import time
 
-def get_destination():
-    r = sr.Recognizer()
-    attempts = 0
 
-    while attempts < 5:
-        speak("Please say your destination")
+def get_destination(stream):
 
-        with sr.Microphone() as source:
-            r.adjust_for_ambient_noise(source, duration=1)
+    recognizer = sr.Recognizer()
 
-            try:
-                audio = r.listen(source, timeout=5, phrase_time_limit=5)
-            except:
-                speak("I did not hear anything")
-                attempts += 1
-                continue
+    recognizer.energy_threshold = 300
+    recognizer.dynamic_energy_threshold = True
 
-        try:
-            text = r.recognize_google(audio)
-            speak(f"You said {text}")
-            return text
+    print("\nGOOGLE DESTINATION MODE")
+    print("Listening...")
 
-        except sr.UnknownValueError:
-            speak("I did not understand, please repeat")
-            attempts += 1
+    try:
 
-        except sr.RequestError:
-            speak("Speech service not available")
-            return None
+        audio_bytes = b""
 
-    speak("Unable to get destination")
-    return None
+        start = time.time()
+
+        while time.time() - start < 5:
+
+            if stream.get_read_available() >= 1024:
+
+                chunk = stream.read(
+                    1024,
+                    exception_on_overflow=False
+                )
+
+                audio_bytes += chunk
+
+            else:
+                time.sleep(0.01)
+
+        print("Processing speech...")
+
+        audio = sr.AudioData(
+            audio_bytes,
+            16000,
+            2
+        )
+
+        text = recognizer.recognize_google(audio)
+
+        print(f"GOOGLE HEARD: {text}")
+
+        return text
+
+    except sr.UnknownValueError:
+
+        print("Google could not understand.")
+
+        return None
+
+    except sr.RequestError as e:
+
+        print(f"Google API Error: {e}")
+
+        return None
+
+    except Exception as e:
+
+        print(f"VOICE INPUT ERROR: {e}")
+
+        return None
