@@ -150,7 +150,18 @@ def run_guidance(stop_event, sva_respond, destination):
 
         while not stop_event.is_set():
 
+            # =========================================
+            # CHECK STOP BEFORE GPS
+            # =========================================
+
+            if stop_event.is_set():
+                break
+
             data = gps.get_location()
+
+            # =========================================
+            # GPS FAILED
+            # =========================================
 
             if not data:
 
@@ -160,13 +171,40 @@ def run_guidance(stop_event, sva_respond, destination):
                     "Waiting for GPS..."
                 )
 
-                time.sleep(1)
+                # INTERRUPTIBLE SLEEP
+                for _ in range(10):
+
+                    if stop_event.is_set():
+                        break
+
+                    time.sleep(0.1)
 
                 continue
 
+            # =========================================
+            # CHECK STOP AFTER GPS
+            # =========================================
+
+            if stop_event.is_set():
+                break
+
             lat, lon, obs, dist = data
 
+            # =========================================
+            # TRACKER
+            # =========================================
+
+            if stop_event.is_set():
+                break
+
             nav_cmd = tracker.update(lat, lon)
+
+            # =========================================
+            # DECISION ENGINE
+            # =========================================
+
+            if stop_event.is_set():
+                break
 
             cmd = engine.decide(
                 obs,
@@ -174,8 +212,22 @@ def run_guidance(stop_event, sva_respond, destination):
                 nav_cmd
             )
 
+            # =========================================
+            # SPEAK
+            # =========================================
+
+            if stop_event.is_set():
+                break
+
             if cmd:
                 speak(cmd)
+
+            # =========================================
+            # CLOUD UPDATE
+            # =========================================
+
+            if stop_event.is_set():
+                break
 
             update_cloud_status(
                 lat,
@@ -183,7 +235,16 @@ def run_guidance(stop_event, sva_respond, destination):
                 cmd if cmd else "Walking safely"
             )
 
-            time.sleep(1)
+            # =========================================
+            # INTERRUPTIBLE SLEEP
+            # =========================================
+
+            for _ in range(10):
+
+                if stop_event.is_set():
+                    break
+
+                time.sleep(0.1)
 
     except Exception as e:
 
@@ -198,3 +259,5 @@ def run_guidance(stop_event, sva_respond, destination):
         )
 
         print("Guidance terminated.")
+
+        print("Route guidance fully stopped.")
