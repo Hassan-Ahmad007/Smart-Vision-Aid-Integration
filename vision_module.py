@@ -3,6 +3,10 @@ from ultralytics import YOLO
 import time
 from collections import deque
 
+
+
+model = YOLO("yolov8n.pt")
+
 # --- CONSTANTS ---
 
 VOTE_THRESHOLD = 3
@@ -17,9 +21,9 @@ def get_votes(cls, history):
     return sum(1 for f_set in history if cls in f_set)
 
 
+
 def run_detection(stop_event, sva_respond):
-    model = YOLO("yolov8n.pt")
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)
 
     frame_count = 0
     skip_frames = 5
@@ -62,7 +66,7 @@ def run_detection(stop_event, sva_respond):
                     last_spoken = cooldowns.get(cls, 0)
                     if current_time - last_spoken > COOLDOWN_TIME:
                         if name != last_announced:
-                            sva_respond(name + " ahead")
+                            sva_respond(name + " ahead",priority=3)
 
                             last_announced = name
                         cooldowns[cls] = current_time

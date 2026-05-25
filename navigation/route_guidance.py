@@ -82,7 +82,7 @@ def run_guidance(stop_event, sva_respond, destination):
             if text and str(text).strip():
                 print(f"[GUIDANCE SPEAK] {text}")
 
-                sva_respond(str(text))
+                sva_respond(str(text),priority=1)
 
         except Exception as e:
 

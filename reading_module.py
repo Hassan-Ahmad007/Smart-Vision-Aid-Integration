@@ -45,10 +45,10 @@ def run_reading(stop_event, sva_respond):
     """Refactored Entry Point for the Manager"""
 
     def speak(text):
-        sva_respond(str(text))
+        sva_respond(str(text),priority=2)
 
     scanner = TextScanner()
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # Using your preferred Index 2
+    cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)  # Using your preferred Index 2
 
     if not cap.isOpened():
         speak("Cannot access camera for reading.")
