@@ -53,8 +53,10 @@ def run_reading(stop_event, sva_respond, camera_index):
 
     scanner = TextScanner()
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # Using your preferred Index 2
+    time.sleep(1)
 
     if not cap.isOpened():
+        cap.release()
         sva_respond(
             "External camera is not available. Reading mode cannot start.",
             priority=0

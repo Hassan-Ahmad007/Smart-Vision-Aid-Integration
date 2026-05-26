@@ -24,8 +24,11 @@ def get_votes(cls, history):
 
 def run_detection(stop_event, sva_respond, camera_index):
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+    time.sleep(1)
 
     if not cap.isOpened():
+        cap.release()
+
         sva_respond(
             "External camera is not available. Detection mode cannot start.",
             priority=0
@@ -49,7 +52,7 @@ def run_detection(stop_event, sva_respond, camera_index):
                 "Camera connection lost. Detection mode stopped.",
                 priority=0
             )
-
+            stop_event.set()
             break
 
 

@@ -4,6 +4,7 @@ import threading
 import subprocess
 import pyaudio
 import cv2
+
 from queue import PriorityQueue
 from vosk import Model, KaldiRecognizer
 
@@ -24,15 +25,17 @@ def find_external_camera():
 
     print("Searching for external camera...")
 
-    for index in range(1, 6):  # skip laptop camera 0
+    for index in range(1, 6):
 
         cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
 
+        time.sleep(1)
+
         if cap.isOpened():
 
-            ret, _ = cap.read()
+            ret, frame = cap.read()
 
-            if ret:
+            if ret and frame is not None:
 
                 cap.release()
 
@@ -48,6 +51,37 @@ def find_external_camera():
 
 
 # =========================================================
+# CAMERA VALIDATION
+# =========================================================
+
+def is_camera_available(index):
+
+    if index is None:
+        return False
+
+    for _ in range(3):
+
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+
+        time.sleep(1)
+
+        if cap.isOpened():
+
+            ret, frame = cap.read()
+
+            cap.release()
+
+            if ret and frame is not None:
+                return True
+
+        cap.release()
+
+        time.sleep(1)
+
+    return False
+
+
+# =========================================================
 # SPEECH PRIORITY QUEUE
 # =========================================================
 
@@ -58,6 +92,7 @@ speech_queue = PriorityQueue()
 # 1 = navigation
 # 2 = system
 # 3 = detection
+
 
 # =========================================================
 # SPEECH WORKER
@@ -96,7 +131,6 @@ def speech_worker():
                 stderr=subprocess.DEVNULL
             )
 
-            # WAIT UNTIL SPEECH FINISHES
             process.wait()
 
         except Exception as e:
@@ -118,6 +152,7 @@ speech_thread = threading.Thread(
 )
 
 speech_thread.start()
+
 
 # =========================================================
 # CENTRAL SPEECH FUNCTION
@@ -209,7 +244,6 @@ if __name__ == "__main__":
     # =====================================================
 
     system_active = False
-
     awaiting_mode_selection = False
 
     active_thread = None
@@ -219,27 +253,6 @@ if __name__ == "__main__":
     stop_signal = threading.Event()
 
     camera_index = find_external_camera()
-
-
-    # =========================================================
-    # CAMERA STATUS
-    # =========================================================
-
-    def is_camera_available(index):
-
-        if index is None:
-            return False
-
-        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-
-        if not cap.isOpened():
-            return False
-
-        ret, _ = cap.read()
-
-        cap.release()
-
-        return ret
 
     # =====================================================
     # STARTUP
@@ -268,6 +281,7 @@ if __name__ == "__main__":
             except Exception as e:
 
                 print(f"MIC ERROR: {e}")
+
                 continue
 
             if rec.AcceptWaveform(data):
@@ -285,7 +299,7 @@ if __name__ == "__main__":
                 print(f"\nUSER: {text}")
 
                 # =================================================
-                # ACTIVATE SYSTEM
+                # ACTIVATE
                 # =================================================
 
                 if not system_active:
@@ -293,7 +307,6 @@ if __name__ == "__main__":
                     if "activate" in text:
 
                         system_active = True
-
                         awaiting_mode_selection = True
 
                         sva_respond(
@@ -306,7 +319,7 @@ if __name__ == "__main__":
                     continue
 
                 # =================================================
-                # INTERRUPT ASSISTANT
+                # INTERRUPT
                 # =================================================
 
                 if "smart vision aid" in text:
@@ -334,7 +347,7 @@ if __name__ == "__main__":
                     continue
 
                 # =================================================
-                # STOP SYSTEM
+                # STOP
                 # =================================================
 
                 if "stop" in text:
@@ -347,10 +360,6 @@ if __name__ == "__main__":
                         guidance_thread,
                         stop_signal
                     )
-
-                    active_thread = None
-                    detection_thread = None
-                    guidance_thread = None
 
                     sva_respond(
                         "System shutting down. Goodbye.",
@@ -372,8 +381,10 @@ if __name__ == "__main__":
                     if "detection" in text:
 
                         if not is_camera_available(camera_index):
+
                             sva_respond(
-                                "Camera is disconnected. Please reconnect the camera.",
+                                "External camera is disconnected or unavailable. "
+                                "Please reconnect the camera and try again.",
                                 priority=0
                             )
 
@@ -388,16 +399,12 @@ if __name__ == "__main__":
                             stop_signal
                         )
 
-                        active_thread = None
-                        detection_thread = None
-                        guidance_thread = None
+                        stop_signal.clear()
 
                         sva_respond(
                             "Starting object detection.",
                             priority=2
                         )
-
-                        stop_signal.clear()
 
                         detection_thread = threading.Thread(
                             target=run_detection,
@@ -416,8 +423,10 @@ if __name__ == "__main__":
                     elif "reading" in text:
 
                         if not is_camera_available(camera_index):
+
                             sva_respond(
-                                "Camera is disconnected. Please reconnect the camera.",
+                                "External camera is disconnected or unavailable. "
+                                "Please reconnect the camera and try again.",
                                 priority=0
                             )
 
@@ -432,16 +441,12 @@ if __name__ == "__main__":
                             stop_signal
                         )
 
-                        active_thread = None
-                        detection_thread = None
-                        guidance_thread = None
+                        stop_signal.clear()
 
                         sva_respond(
                             "Starting reading mode.",
                             priority=2
                         )
-
-                        stop_signal.clear()
 
                         active_thread = threading.Thread(
                             target=run_reading,
@@ -454,7 +459,7 @@ if __name__ == "__main__":
                         rec.Reset()
 
                     # =================================================
-                    # ROUTE GUIDANCE MODE
+                    # GUIDANCE MODE
                     # =================================================
 
                     elif "guidance" in text:
@@ -467,10 +472,6 @@ if __name__ == "__main__":
                             guidance_thread,
                             stop_signal
                         )
-
-                        active_thread = None
-                        detection_thread = None
-                        guidance_thread = None
 
                         sva_respond(
                             "Please say your destination.",
@@ -492,23 +493,26 @@ if __name__ == "__main__":
                                 priority=1
                             )
 
-                            # =====================================
-                            # START DETECTION THREAD
-                            # =====================================
-
                             stop_signal.clear()
 
-                            detection_thread = threading.Thread(
-                                target=run_detection,
-                                args=(stop_signal, sva_respond, camera_index),
-                                daemon=True
-                            )
+                            # START DETECTION ONLY IF CAMERA EXISTS
+                            if is_camera_available(camera_index):
 
-                            detection_thread.start()
+                                detection_thread = threading.Thread(
+                                    target=run_detection,
+                                    args=(stop_signal, sva_respond, camera_index),
+                                    daemon=True
+                                )
 
-                            # =====================================
-                            # START GUIDANCE THREAD
-                            # =====================================
+                                detection_thread.start()
+
+                            else:
+
+                                sva_respond(
+                                    "Camera is unavailable. "
+                                    "Navigation will continue without obstacle detection.",
+                                    priority=1
+                                )
 
                             guidance_thread = threading.Thread(
                                 target=run_guidance,
