@@ -3,8 +3,8 @@ import time
 import threading
 import subprocess
 import pyaudio
+import cv2
 from queue import PriorityQueue
-
 from vosk import Model, KaldiRecognizer
 
 # =========================================================
@@ -15,6 +15,37 @@ from vision_module import run_detection
 from reading_module import run_reading
 from navigation.voice_input import get_destination
 from navigation.route_guidance import run_guidance
+
+# =========================================================
+# CAMERA MANAGER
+# =========================================================
+
+def find_external_camera():
+
+    print("Searching for external camera...")
+
+    for index in range(1, 6):  # skip laptop camera 0
+
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+
+        if cap.isOpened():
+
+            ret, _ = cap.read()
+
+            if ret:
+
+                cap.release()
+
+                print(f"External camera found at index {index}")
+
+                return index
+
+        cap.release()
+
+    print("No external camera detected.")
+
+    return None
+
 
 # =========================================================
 # SPEECH PRIORITY QUEUE
@@ -119,6 +150,8 @@ def kill_current_mode(
 
             t.join(timeout=2)
 
+    cv2.destroyAllWindows()
+
 
 # =========================================================
 # MAIN PROGRAM
@@ -184,6 +217,29 @@ if __name__ == "__main__":
     guidance_thread = None
 
     stop_signal = threading.Event()
+
+    camera_index = find_external_camera()
+
+
+    # =========================================================
+    # CAMERA STATUS
+    # =========================================================
+
+    def is_camera_available(index):
+
+        if index is None:
+            return False
+
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+
+        if not cap.isOpened():
+            return False
+
+        ret, _ = cap.read()
+
+        cap.release()
+
+        return ret
 
     # =====================================================
     # STARTUP
@@ -315,6 +371,14 @@ if __name__ == "__main__":
 
                     if "detection" in text:
 
+                        if not is_camera_available(camera_index):
+                            sva_respond(
+                                "Camera is disconnected. Please reconnect the camera.",
+                                priority=0
+                            )
+
+                            continue
+
                         awaiting_mode_selection = False
 
                         kill_current_mode(
@@ -337,7 +401,7 @@ if __name__ == "__main__":
 
                         detection_thread = threading.Thread(
                             target=run_detection,
-                            args=(stop_signal, sva_respond),
+                            args=(stop_signal, sva_respond, camera_index),
                             daemon=True
                         )
 
@@ -350,6 +414,14 @@ if __name__ == "__main__":
                     # =================================================
 
                     elif "reading" in text:
+
+                        if not is_camera_available(camera_index):
+                            sva_respond(
+                                "Camera is disconnected. Please reconnect the camera.",
+                                priority=0
+                            )
+
+                            continue
 
                         awaiting_mode_selection = False
 
@@ -373,7 +445,7 @@ if __name__ == "__main__":
 
                         active_thread = threading.Thread(
                             target=run_reading,
-                            args=(stop_signal, sva_respond),
+                            args=(stop_signal, sva_respond, camera_index),
                             daemon=True
                         )
 
@@ -428,7 +500,7 @@ if __name__ == "__main__":
 
                             detection_thread = threading.Thread(
                                 target=run_detection,
-                                args=(stop_signal, sva_respond),
+                                args=(stop_signal, sva_respond, camera_index),
                                 daemon=True
                             )
 

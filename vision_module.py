@@ -22,21 +22,37 @@ def get_votes(cls, history):
 
 
 
-def run_detection(stop_event, sva_respond):
-    cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+def run_detection(stop_event, sva_respond, camera_index):
+    cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+
+    if not cap.isOpened():
+        sva_respond(
+            "External camera is not available. Detection mode cannot start.",
+            priority=0
+        )
+
+        return
 
     frame_count = 0
     skip_frames = 5
     detection_history = deque(maxlen=5)
     cooldowns = {}
     raw_detections = []
-    last_announced = None
 
     print("Vision Module Started...")
 
     while not stop_event.is_set():
         ret, frame = cap.read()
-        if not ret: break
+
+        if not ret or frame is None:
+            sva_respond(
+                "Camera connection lost. Detection mode stopped.",
+                priority=0
+            )
+
+            break
+
+
 
         if frame_count % skip_frames == 0:
             results = model.predict(frame, conf=CONF_THRESH, classes=TARGET_CLASSES, verbose=False)[0]
@@ -65,10 +81,7 @@ def run_detection(stop_event, sva_respond):
                 if is_verified:
                     last_spoken = cooldowns.get(cls, 0)
                     if current_time - last_spoken > COOLDOWN_TIME:
-                        if name != last_announced:
-                            sva_respond(name + " ahead",priority=3)
-
-                            last_announced = name
+                        sva_respond(name + " ahead",priority=3)
                         cooldowns[cls] = current_time
 
                 # Store visual data

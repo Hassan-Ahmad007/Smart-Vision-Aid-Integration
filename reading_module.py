@@ -8,6 +8,8 @@ import os
 from imagepreprocessing import preprocess_fast
 from textextractor import extract_text
 
+
+
 # TESSERACT PATH (Keep your local path)
 pytesseract.pytesseract.tesseract_cmd = r"C:\Users\hp\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
@@ -41,17 +43,23 @@ class TextScanner:
             return 0.0
 
 
-def run_reading(stop_event, sva_respond):
+
+
+def run_reading(stop_event, sva_respond, camera_index):
     """Refactored Entry Point for the Manager"""
 
     def speak(text):
         sva_respond(str(text),priority=2)
 
     scanner = TextScanner()
-    cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)  # Using your preferred Index 2
+    cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # Using your preferred Index 2
 
     if not cap.isOpened():
-        speak("Cannot access camera for reading.")
+        sva_respond(
+            "External camera is not available. Reading mode cannot start.",
+            priority=0
+        )
+
         return
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)  # Adjusted for stability
@@ -67,7 +75,14 @@ def run_reading(stop_event, sva_respond):
     try:
         while not stop_event.is_set():
             ret, frame = cap.read()
-            if not ret: break
+
+            if not ret or frame is None:
+                sva_respond(
+                    "Camera connection lost. Reading mode stopped.",
+                    priority=0
+                )
+
+                break
 
             h, w = frame.shape[:2]
             x1, y1 = (w - scanner.box_w) // 2, (h - scanner.box_h) // 2
@@ -112,7 +127,7 @@ def run_reading(stop_event, sva_respond):
 
                         # Process logic (inline)
                         processed_image, _ = preprocess_fast(best_roi)
-                        text = extract_text(best_roi)
+                        text = extract_text(processed_image)
 
                         if text:
 
@@ -128,6 +143,7 @@ def run_reading(stop_event, sva_respond):
                             )
                         # Reset for next scan
                         best_conf = 0
+                        best_roi = None
                         scanner.perfect_start_time = None
             else:
                 scanner.perfect_start_time = None
