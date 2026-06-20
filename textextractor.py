@@ -1,69 +1,60 @@
 import pytesseract
 import re
-import cv2
+import numpy as np
 
 
-def extract_text(preprocessed_image):
-    """
-    Extract text from image and return it.
-    NO speech here.
-    """
+def clean_ocr_text(text):
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
-    if preprocessed_image is None:
-        return ""
 
-    # =====================================================
-    # OCR CONFIGS
-    # =====================================================
-
-    ocr_configs = [
+def extract_text_with_confidence(image):
+    configs = [
         "--oem 3 --psm 6",
         "--oem 3 --psm 11",
         "--oem 3 --psm 3"
     ]
 
-    final_text = ""
+    best_text = ""
+    best_score = 0
 
-    # =====================================================
-    # NORMAL OCR
-    # =====================================================
-
-    for config in ocr_configs:
-
-        text = pytesseract.image_to_string(
-            preprocessed_image,
-            config=config
-        )
-
-        text = re.sub(r'\s+', ' ', text).strip()
-
-        if len(text) >= 5:
-
-            final_text = text
-
-            break
-
-    # =====================================================
-    # FALLBACK INVERTED IMAGE
-    # =====================================================
-
-    if not final_text:
-
-        inverted = cv2.bitwise_not(preprocessed_image)
-
-        for config in ocr_configs:
-
-            text = pytesseract.image_to_string(
-                inverted,
-                config=config
+    for config in configs:
+        try:
+            data = pytesseract.image_to_data(
+                image,
+                config=config,
+                output_type=pytesseract.Output.DICT
             )
 
-            text = re.sub(r'\s+', ' ', text).strip()
+            words = []
+            confs = []
 
-            if len(text) >= 5:
+            for word, conf in zip(data["text"], data["conf"]):
+                word = word.strip()
 
-                final_text = text
+                try:
+                    conf = float(conf)
+                except:
+                    conf = -1
 
-                break
+                if word and conf > 20:
+                    words.append(word)
+                    confs.append(conf)
 
-    return final_text
+            text = clean_ocr_text(" ".join(words))
+
+            if not text:
+                continue
+
+            avg_conf = np.mean(confs) if confs else 0
+            length_bonus = min(len(text) / 120, 1) * 20
+            score = avg_conf + length_bonus
+
+            if score > best_score:
+                best_score = score
+                best_text = text
+
+        except Exception:
+            continue
+
+    return best_text, best_score
