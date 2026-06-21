@@ -1,3 +1,4 @@
+
 import asyncio
 import serial
 from winsdk.windows.devices.geolocation import Geolocator
@@ -28,7 +29,7 @@ class GPSInput:
             future = asyncio.wait_for(self._get_coords(), timeout=5)
             lat, lon = loop.run_until_complete(future)
 
-            print(f"GPS (Laptop): {lat}, {lon}")
+            # 🔴 Removed print(f"GPS (Laptop): {lat}, {lon}")
             return lat, lon, 0, 999
 
         except Exception as e:
@@ -40,8 +41,6 @@ class GPSInput:
         try:
             line = self.ser.readline().decode().strip()
 
-            # expected format:
-            # LAT:xx,LON:yy,OBS:0,DIST:999
             data = {}
             for item in line.split(","):
                 k, v = item.split(":")
@@ -52,7 +51,7 @@ class GPSInput:
             obs = data.get("OBS", 0)
             dist = data.get("DIST", 999)
 
-            print(f"GPS (Arduino): {lat}, {lon}")
+            # 🔴 Removed print(f"GPS (Arduino): {lat}, {lon}")
             return lat, lon, obs, dist
 
         except Exception as e:
@@ -68,19 +67,16 @@ class GPSInput:
             future = asyncio.wait_for(self._get_coords(), timeout=5)
             lat, lon = loop.run_until_complete(future)
 
-            # save last good value
             self.last_location = (lat, lon)
 
-            print(f"GPS (Laptop): {lat}, {lon}")
+            # 🔴 Removed print(f"GPS (Laptop): {lat}, {lon}")
             return lat, lon, 0, 999
 
         except Exception as e:
             print("GPS ERROR (Laptop):", e)
 
-            # 🔴 USE LAST KNOWN LOCATION
             if hasattr(self, "last_location"):
                 lat, lon = self.last_location
-                print(f"USING LAST GPS: {lat}, {lon}")
                 return lat, lon, 0, 999
 
             return None

@@ -4,16 +4,68 @@ import threading
 import subprocess
 import pyaudio
 import cv2
+import os
 
 from queue import PriorityQueue
 from vosk import Model, KaldiRecognizer
+
+# =========================================================
+# FIREBASE INTEGRATION (From Local)
+# =========================================================
+import firebase_admin
+from firebase_admin import credentials, db
+
+KEY_PATH = "serviceAccountKey.json"
+db_ref = None
+
+try:
+    if not firebase_admin._apps:
+        if os.path.exists(KEY_PATH):
+            cred = credentials.Certificate(KEY_PATH)
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://guardianapp-3f979-default-rtdb.firebaseio.com/'
+            })
+            print("Firebase connected successfully via main file.")
+            db_ref = db.reference('blind_user_01')
+        else:
+            print("Firebase key not found in root path.")
+except Exception as e:
+    print(f"Firebase Initialization Error: {e}")
+
+
+def update_cloud_status_central(lat, lng, status_msg="OK", error=False, camera_on=False, gps_on=False):
+    try:
+        if firebase_admin._apps and db_ref:
+            db_ref.update({
+                'location': {
+                    'lat': lat,
+                    'lng': lng
+                },
+                'status': status_msg,
+                'is_error': error,
+                'last_heartbeat': time.time(),
+                'camera_active': camera_on,
+                'gps_active': gps_on
+            })
+    except Exception as e:
+        pass
+
+
+# =========================================================
+# MODULES (Combined GitHub + Local)
+# =========================================================
 
 from vision_module import run_detection
 from reading_module import run_reading
 from currency_module import run_currency
 from navigation.voice_input import get_destination
 from navigation.route_guidance import run_guidance
+from navigation.gps_input import GPSInput  # Imported for central monitoring
 
+
+# =========================================================
+# CAMERA MANAGER
+# =========================================================
 
 def find_external_camera():
     print("Searching for external camera...")
@@ -56,6 +108,10 @@ def is_camera_available(index):
 
     return False
 
+
+# =========================================================
+# SPEECH PRIORITY QUEUE
+# =========================================================
 
 speech_queue = PriorityQueue()
 
@@ -120,6 +176,10 @@ def clear_speech_queue():
             break
 
 
+# =========================================================
+# STOP CURRENT MODE
+# =========================================================
+
 def kill_current_mode(
     active_thread,
     detection_thread,
@@ -142,6 +202,68 @@ def kill_current_mode(
 
     cv2.destroyAllWindows()
 
+
+# =========================================================
+# CLOUD BACKGROUND WORKER (Updated for Currency Mode)
+# =========================================================
+
+def cloud_monitor_worker(stop_signal, get_threads_func):
+    """
+    Monitors system state and pushes continuous telemetry to Firebase.
+    """
+    gps_instance = GPSInput()
+
+    while not stop_signal.is_set():
+        act_t, det_t, guid_t, curr_t = get_threads_func()
+
+        # Check camera statuses based on running modules (Now includes Currency)
+        camera_active = False
+        if (det_t and det_t.is_alive()) or (act_t and act_t.is_alive()) or (curr_t and curr_t.is_alive()):
+            camera_active = True
+
+        # Check navigation status
+        if guid_t and guid_t.is_alive():
+            gps_data = gps_instance.get_location()
+            if gps_data:
+                lat, lon, obs, dist = gps_data
+                update_cloud_status_central(
+                    lat=lat,
+                    lng=lon,
+                    status_msg="Walking safely",
+                    error=False,
+                    camera_on=camera_active,
+                    gps_on=True
+                )
+            else:
+                update_cloud_status_central(
+                    lat=0,
+                    lng=0,
+                    status_msg="Waiting for GPS...",
+                    error=False,
+                    camera_on=camera_active,
+                    gps_on=False
+                )
+        else:
+            # System idle or non-navigation modes
+            status_msg = "System Active" if (act_t or det_t or curr_t) else "System Idle"
+            update_cloud_status_central(
+                lat=0,
+                lng=0,
+                status_msg=status_msg,
+                error=False,
+                camera_on=camera_active,
+                gps_on=False
+            )
+
+        time.sleep(1.0)
+
+    # When stopping execution
+    update_cloud_status_central(0, 0, "Navigation stopped", error=False, camera_on=False, gps_on=False)
+
+
+# =========================================================
+# MAIN PROGRAM
+# =========================================================
 
 if __name__ == "__main__":
 
@@ -208,6 +330,24 @@ if __name__ == "__main__":
     stop_signal = threading.Event()
 
     camera_index = find_external_camera()
+
+
+    # =====================================================
+    # FIREBASE MONITORING INITIALIZATION
+    # =====================================================
+    
+    # Lambda function to pass thread objects safely to the cloud worker
+    def get_current_threads():
+        return active_thread, detection_thread, guidance_thread, currency_thread
+
+    # Start Central Cloud Monitor
+    cloud_thread = threading.Thread(
+        target=cloud_monitor_worker,
+        args=(stop_signal, get_current_threads),
+        daemon=True
+    )
+    cloud_thread.start()
+
 
     print("\n========================================")
     print("SYSTEM READY")
@@ -583,12 +723,14 @@ if __name__ == "__main__":
                                     priority=1
                                 )
 
+                            # 🟢 FIREBASE SYNC: update_cloud_status_central passed here
                             guidance_thread = threading.Thread(
                                 target=run_guidance,
                                 args=(
                                     stop_signal,
                                     sva_respond,
-                                    destination
+                                    destination,
+                                    update_cloud_status_central 
                                 ),
                                 daemon=True
                             )

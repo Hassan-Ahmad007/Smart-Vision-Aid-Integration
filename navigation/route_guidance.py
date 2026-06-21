@@ -2,9 +2,6 @@
 # navigation/route_guidance.py
 # =========================
 
-import firebase_admin
-from firebase_admin import credentials, db
-
 import time
 import os
 
@@ -14,78 +11,17 @@ from navigation.route_processor import process_route
 from navigation.tracker import Tracker
 from navigation.decision_engine import DecisionEngine
 
-
-# =========================================================
-# FIREBASE
-# =========================================================
-
-KEY_PATH = "serviceAccountKey.json"
-
-try:
-
-    if not firebase_admin._apps:
-
-        if os.path.exists(KEY_PATH):
-
-            cred = credentials.Certificate(KEY_PATH)
-
-            firebase_admin.initialize_app(cred, {
-                'databaseURL':
-                    'https://guardianapp-3f979-default-rtdb.firebaseio.com/'
-            })
-
-            print("Firebase connected.")
-
-        else:
-            print("Firebase key not found.")
-
-    ref = db.reference('blind_user_01')
-
-except Exception as e:
-
-    print(f"Firebase Error: {e}")
-
-
-# =========================================================
-# CLOUD UPDATE
-# =========================================================
-
-def update_cloud_status(lat, lng, status_msg="OK", error=False):
-
-    try:
-
-        if firebase_admin._apps:
-
-            ref.update({
-                'location': {
-                    'lat': lat,
-                    'lng': lng
-                },
-                'status': status_msg,
-                'is_error': error,
-                'last_heartbeat': time.time()
-            })
-
-    except:
-        pass
-
-
 # =========================================================
 # MAIN GUIDANCE
 # =========================================================
 
-def run_guidance(stop_event, sva_respond, destination):
+def run_guidance(stop_event, sva_respond, destination, update_cloud):
     def speak(text):
-
         try:
-
             if text and str(text).strip():
                 print(f"[GUIDANCE SPEAK] {text}")
-
-                sva_respond(str(text),priority=1)
-
+                sva_respond(str(text), priority=1)
         except Exception as e:
-
             print(f"SPEAK ERROR: {e}")
 
     print(f"\nSTARTING GUIDANCE TO: {destination}")
@@ -96,13 +32,11 @@ def run_guidance(stop_event, sva_respond, destination):
     # -------------------------------------------------
     # INITIAL GPS
     # -------------------------------------------------
-
     data = gps.get_location()
-
     if not data:
-
         speak("GPS not connected. Please move outdoors.")
-
+        # Call the passed update function
+        update_cloud(0, 0, status_msg="GPS Error", error=True, gps_on=False)
         return
 
     start_coords = (data[0], data[1])
@@ -110,50 +44,44 @@ def run_guidance(stop_event, sva_respond, destination):
     # -------------------------------------------------
     # GEOCODING
     # -------------------------------------------------
-
     speak(f"Finding route to {destination}")
-
     end = geocode(destination)
-
     if not end:
-
         speak("I could not find that destination.")
-
+        update_cloud(start_coords[0], start_coords[1], status_msg="Geocoding Failed", error=True)
         return
 
     # -------------------------------------------------
     # ROUTE FETCH
     # -------------------------------------------------
-
     route_data = get_route(start_coords, end)
-
     steps, total_dist = process_route(route_data)
-
     if not steps:
-
         speak("Unable to calculate route.")
-
+        update_cloud(start_coords[0], start_coords[1], status_msg="Route calculation failed", error=True)
         return
 
     tracker = Tracker(steps)
+    speak(f"Route found. Distance is {int(total_dist)} meters.")
 
-    speak(
-        f"Route found. Distance is "
-        f"{int(total_dist)} meters."
-    )
+    # 👇 FIXED IMMEDIATE INSTRUCTION LOGIC 👇
+    if steps:
+        # Use the simplified direction (STRAIGHT/LEFT/RIGHT) instead of raw map text
+        first_dir = steps[0].get("direction", "STRAIGHT")
+        first_distance = int(steps[0].get("distance", 0))
+        
+        # Instantly announce the first step and its distance cleanly
+        speak(f"To start: Go {first_dir} for {first_distance} meters.")
+        
+        # Mark as announced so the tracker doesn't repeat it right away
+        steps[0]["announced"] = True
+    # 👆 ================================== 👆
 
     # -------------------------------------------------
     # MAIN LOOP
     # -------------------------------------------------
-
     try:
-
         while not stop_event.is_set():
-
-            # =========================================
-            # CHECK STOP BEFORE GPS
-            # =========================================
-
             if stop_event.is_set():
                 break
 
@@ -162,28 +90,13 @@ def run_guidance(stop_event, sva_respond, destination):
             # =========================================
             # GPS FAILED
             # =========================================
-
             if not data:
-
-                update_cloud_status(
-                    0,
-                    0,
-                    "Waiting for GPS..."
-                )
-
-                # INTERRUPTIBLE SLEEP
+                update_cloud(0, 0, status_msg="GPS Signal Lost", error=True, gps_on=False)
                 for _ in range(10):
-
                     if stop_event.is_set():
                         break
-
                     time.sleep(0.1)
-
                 continue
-
-            # =========================================
-            # CHECK STOP AFTER GPS
-            # =========================================
 
             if stop_event.is_set():
                 break
@@ -193,71 +106,44 @@ def run_guidance(stop_event, sva_respond, destination):
             # =========================================
             # TRACKER
             # =========================================
-
-            if stop_event.is_set():
-                break
-
             nav_cmd = tracker.update(lat, lon)
+            if nav_cmd:
+                print(f"[NAV ROUTE STATUS] Directive: {nav_cmd}")
 
             # =========================================
             # DECISION ENGINE
             # =========================================
+            cmd = engine.decide(obs, dist, nav_cmd)
 
-            if stop_event.is_set():
-                break
-
-            cmd = engine.decide(
-                obs,
-                dist,
-                nav_cmd
+            # =========================================
+            # KEEP FIREBASE ONLINE (Heartbeat Update)
+            # =========================================
+            status_text = f"Navigating to {destination} -> {cmd if cmd else 'Moving Straight'}"
+            update_cloud(
+                lat=lat,
+                lng=lon,
+                status_msg=status_text,
+                error=False,
+                camera_on=True,
+                gps_on=True
             )
 
             # =========================================
             # SPEAK
             # =========================================
-
-            if stop_event.is_set():
-                break
-
             if cmd:
                 speak(cmd)
 
-            # =========================================
-            # CLOUD UPDATE
-            # =========================================
-
-            if stop_event.is_set():
-                break
-
-            update_cloud_status(
-                lat,
-                lon,
-                cmd if cmd else "Walking safely"
-            )
-
-            # =========================================
             # INTERRUPTIBLE SLEEP
-            # =========================================
-
             for _ in range(10):
-
                 if stop_event.is_set():
                     break
-
                 time.sleep(0.1)
 
     except Exception as e:
-
         print(f"GUIDANCE ERROR: {e}")
-
+        update_cloud(0, 0, status_msg=f"Error: {str(e)}", error=True)
     finally:
-
-        update_cloud_status(
-            0,
-            0,
-            "Navigation stopped"
-        )
-
+        update_cloud(0, 0, status_msg="IDLE / Stopped", error=False, camera_on=False, gps_on=False)
         print("Guidance terminated.")
-
         print("Route guidance fully stopped.")

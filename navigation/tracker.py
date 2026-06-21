@@ -1,3 +1,4 @@
+
 from navigation.utils import distance
 from navigation.config  import STEP_THRESHOLD
 
@@ -31,7 +32,7 @@ class Tracker:
 
         dist = distance(lat, lon, step_lat, step_lon)
 
-        print("Distance to step:", dist)
+        # 🔴 REMOVED RAW PRINT SPAM TO KEEP TERMINAL CLEAN
 
         # ---------------- IGNORE HUGE GPS JUMPS ----------------
         if dist > 200:
