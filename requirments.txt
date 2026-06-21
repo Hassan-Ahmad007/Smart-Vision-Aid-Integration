@@ -1,0 +1,15 @@
+vosk
+sounddevice
+opencv-python
+ultralytics
+pytesseract
+numpy
+requests
+PyAudio
+pyttsx3
+SpeechRecognition
+pyserial
+winsdk
+pyaudio
+vosk 
+firebase-admin
