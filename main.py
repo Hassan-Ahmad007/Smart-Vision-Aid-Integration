@@ -116,8 +116,15 @@ def is_camera_available(index):
 speech_queue = PriorityQueue()
 
 
+current_tts_process = None
+tts_lock = threading.Lock()
+
 def speech_worker():
+
+    global current_tts_process
+
     while True:
+
         priority, timestamp, text = speech_queue.get()
 
         if text is None:
@@ -125,6 +132,7 @@ def speech_worker():
             break
 
         try:
+
             print(f"\nSVA: {text}")
 
             text = str(text).replace('"', '')
@@ -137,20 +145,26 @@ def speech_worker():
             $speak.Speak("{text}");
             '''
 
-            process = subprocess.Popen(
-                ["powershell", "-Command", command],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            with tts_lock:
 
-            process.wait()
+                current_tts_process = subprocess.Popen(
+                    ["powershell", "-Command", command],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+
+            current_tts_process.wait()
 
         except Exception as e:
+
             print(f"TTS ERROR: {e}")
 
         finally:
-            speech_queue.task_done()
 
+            with tts_lock:
+                current_tts_process = None
+
+            speech_queue.task_done()
 
 speech_thread = threading.Thread(
     target=speech_worker,
@@ -163,17 +177,46 @@ speech_thread.start()
 def sva_respond(text, priority=2):
     if not text:
         return
+    print(
+        f"[QUEUE] Size before add: "
+        f"{speech_queue.qsize()}"
+    )
 
-    speech_queue.put((priority, time.time(), text))
+    speech_queue.put(
+        (priority, time.time(), text)
+    )
 
 
 def clear_speech_queue():
+
+    stop_current_speech()
+
     while not speech_queue.empty():
+
         try:
+
             speech_queue.get_nowait()
             speech_queue.task_done()
+
         except:
             break
+
+def stop_current_speech():
+
+    global current_tts_process
+
+    with tts_lock:
+
+        if current_tts_process:
+
+            try:
+
+                current_tts_process.terminate()
+
+            except:
+                pass
+
+            current_tts_process = None
 
 
 # =========================================================
@@ -188,7 +231,7 @@ def kill_current_mode(
     stop_signal
 ):
     stop_signal.set()
-
+    stop_current_speech()
     clear_speech_queue()
 
     for t in [
@@ -235,7 +278,7 @@ def cloud_monitor_worker(stop_signal, get_threads_func):
                     gps_on=True
                 )
             else:
-                update_cloud_status_central(
+                 update_cloud_status_central(
                     lat=0,
                     lng=0,
                     status_msg="Waiting for GPS...",
@@ -406,7 +449,7 @@ if __name__ == "__main__":
                 if text in ["shutdown", "shut down", "exit system"]:
 
                     stop_signal.set()
-
+                    stop_current_speech()
                     kill_current_mode(
                         active_thread,
                         detection_thread,
@@ -420,6 +463,7 @@ if __name__ == "__main__":
                         priority=0
                     )
 
+                    speech_queue.join()
                     break
 
                 # =================================================
@@ -730,7 +774,7 @@ if __name__ == "__main__":
                                     stop_signal,
                                     sva_respond,
                                     destination,
-                                    update_cloud_status_central 
+                                    update_cloud_status_central
                                 ),
                                 daemon=True
                             )
@@ -765,7 +809,7 @@ if __name__ == "__main__":
         print("\nCleaning up...")
 
         stop_signal.set()
-
+        stop_current_speech()
         kill_current_mode(
             active_thread,
             detection_thread,

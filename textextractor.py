@@ -37,9 +37,11 @@ def extract_text_with_confidence(image):
                 except:
                     conf = -1
 
-                if word and conf > 20:
+                if word:
                     words.append(word)
-                    confs.append(conf)
+
+                    if conf > 0:
+                        confs.append(conf)
 
             text = clean_ocr_text(" ".join(words))
 
@@ -50,11 +52,19 @@ def extract_text_with_confidence(image):
             length_bonus = min(len(text) / 120, 1) * 20
             score = avg_conf + length_bonus
 
+            print("CONFIG:", config)
+            print("TEXT:", text)
+            print("CONF:", avg_conf)
+
             if score > best_score:
                 best_score = score
                 best_text = text
 
-        except Exception:
+
+        except Exception as e:
+
+            print("TESSERACT ERROR:", e)
+
             continue
 
     return best_text, best_score

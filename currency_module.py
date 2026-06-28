@@ -85,31 +85,33 @@ def remove_duplicate_boxes(detections):
     return final
 
 
+# def make_regions(frame):
+#     """
+#     720p C270 webcam:
+#     Full frame + center/left/right crops.
+#     Helps detect a note even when glasses camera is slightly misaligned.
+#     """
+#
+#     h, w = frame.shape[:2]
+#     mid_x = w // 2
+#     overlap = int(w * 0.12)
+#
+#     regions = []
+#
+#     regions.append(("full", frame, 0, 0))
+#
+#     regions.append(
+#         ("left", frame[:, 0:mid_x + overlap], 0, 0)
+#     )
+#
+#     regions.append(
+#         ("right", frame[:, mid_x - overlap:w], mid_x - overlap, 0)
+#     )
+#
+#     return regions
+
 def make_regions(frame):
-    """
-    720p C270 webcam:
-    Full frame + center/left/right crops.
-    Helps detect a note even when glasses camera is slightly misaligned.
-    """
-
-    h, w = frame.shape[:2]
-    mid_x = w // 2
-    overlap = int(w * 0.12)
-
-    regions = []
-
-    regions.append(("full", frame, 0, 0))
-
-    regions.append(
-        ("left", frame[:, 0:mid_x + overlap], 0, 0)
-    )
-
-    regions.append(
-        ("right", frame[:, mid_x - overlap:w], mid_x - overlap, 0)
-    )
-
-    return regions
-
+    return [("full", frame, 0, 0)]
 
 def detect_notes(frame):
     frame_h, frame_w = frame.shape[:2]
@@ -223,7 +225,21 @@ def guide_user(note, frame_w, frame_h):
 
 def run_currency(stop_event, sva_respond, camera_index):
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
-    time.sleep(1)
+
+    cap.set(
+        cv2.CAP_PROP_FOURCC,
+        cv2.VideoWriter_fourcc(*'MJPG')
+    )
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+
+    time.sleep(2)
+
+
+    ret, test_frame = cap.read()
+
 
     if not cap.isOpened():
         cap.release()
@@ -419,7 +435,7 @@ def run_currency(stop_event, sva_respond, camera_index):
     finally:
         cap.release()
         cv2.destroyAllWindows()
-
+        print(currency_model.model.yaml)
         sva_respond(
             f"Currency mode stopped. Final total is {total_amount} rupees. Goodbye.",
             priority=2

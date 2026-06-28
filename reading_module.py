@@ -16,7 +16,7 @@ class TextScanner:
         self.box_h_ratio = 0.68
 
         self.stable_count = 0
-        self.stability_threshold = 5
+        self.stability_threshold = 3
         self.perfect_start_time = None
 
     def get_reading_box(self, frame_w, frame_h):
@@ -30,11 +30,17 @@ class TextScanner:
 
         return x1, y1, x2, y2
 
-    def check_stability(self, prev_gray, curr_gray, threshold=12):
+    def check_stability(self, prev_gray, curr_gray, threshold=35):
         if prev_gray is None:
             return False
+
         diff = cv2.absdiff(prev_gray, curr_gray)
-        return np.mean(diff) < threshold
+
+        motion = np.mean(diff)
+
+        print(f"Motion={motion:.2f}")
+
+        return motion < threshold
 
     def calculate_quality(self, roi_gray):
         blur_score = cv2.Laplacian(roi_gray, cv2.CV_64F).var()
@@ -54,13 +60,23 @@ class TextScanner:
 
 
 def get_best_ocr_text(roi):
+
     best_text = ""
     best_score = 0
 
-    versions = preprocess_versions(roi)
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+
+    versions = [("original_gray", gray)]
+    versions.extend(preprocess_versions(roi))
 
     for name, processed in versions:
+
         text, score = extract_text_with_confidence(processed)
+
+        print(f"\nVERSION: {name}")
+        print(f"SCORE: {score}")
+        print(f"TEXT: {text}")
+
         if score > best_score:
             best_score = score
             best_text = text
@@ -160,9 +176,14 @@ def run_reading(stop_event, sva_respond, camera_index):
 
                 # Balanced Threshold adjustments for real-world document feeds
                 ready_to_capture = (quality >= 0.40 and scanner.stable_count >= scanner.stability_threshold)
-
+                print(
+                    f"Quality={quality:.2f} "
+                    f"Stable={scanner.stable_count} "
+                    f"Ready={ready_to_capture}"
+                )
                 if ready_to_capture:
                     if scanner.perfect_start_time is None:
+                        print("START TIMER")
                         scanner.perfect_start_time = now
                         speak("Hold still. Capturing text.", priority=2)
 
@@ -176,8 +197,14 @@ def run_reading(stop_event, sva_respond, camera_index):
                             cv2.waitKey(1)
 
                             raw_text, ocr_score = get_best_ocr_text(best_roi)
+                            print("\n====================")
+                            print("OCR SCORE:", ocr_score)
+                            print("RAW TEXT:")
+                            print(raw_text)
+                            print("====================\n")
+                            cv2.imwrite("captured_page.jpg", best_roi)
 
-                            if raw_text and ocr_score > 20:  # Slipped baseline for better accessibility catch
+                            if raw_text:  # Slipped baseline for better accessibility catch
                                 cleaned_text = clean_text_with_llm(raw_text)
 
                                 if cleaned_text:
@@ -192,6 +219,9 @@ def run_reading(stop_event, sva_respond, camera_index):
                             scan_cooldown = True
                             cooldown_start = time.time()
                 else:
+                    if scanner.perfect_start_time is not None:
+                        print("RESET TIMER")
+
                     scanner.perfect_start_time = None
 
             cv2.imshow("SVA - Reading Mode", frame)
