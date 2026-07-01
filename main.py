@@ -115,12 +115,10 @@ def is_camera_available(index):
 
 speech_queue = PriorityQueue()
 
-
 current_tts_process = None
 tts_lock = threading.Lock()
 
 def speech_worker():
-
     global current_tts_process
 
     while True:
@@ -166,6 +164,7 @@ def speech_worker():
 
             speech_queue.task_done()
 
+
 speech_thread = threading.Thread(
     target=speech_worker,
     daemon=True
@@ -174,9 +173,14 @@ speech_thread = threading.Thread(
 speech_thread.start()
 
 
-def sva_respond(text, priority=2):
+def sva_respond(text, priority=2, interrupt=False):
     if not text:
         return
+
+    # 🟢 If interrupt is True, instantly kill current speech and clear the queue
+    if interrupt:
+        clear_speech_queue()
+
     print(
         f"[QUEUE] Size before add: "
         f"{speech_queue.qsize()}"
@@ -186,9 +190,7 @@ def sva_respond(text, priority=2):
         (priority, time.time(), text)
     )
 
-
 def clear_speech_queue():
-
     stop_current_speech()
 
     while not speech_queue.empty():
@@ -202,7 +204,6 @@ def clear_speech_queue():
             break
 
 def stop_current_speech():
-
     global current_tts_process
 
     with tts_lock:
@@ -224,11 +225,11 @@ def stop_current_speech():
 # =========================================================
 
 def kill_current_mode(
-    active_thread,
-    detection_thread,
-    guidance_thread,
-    currency_thread,
-    stop_signal
+        active_thread,
+        detection_thread,
+        guidance_thread,
+        currency_thread,
+        stop_signal
 ):
     stop_signal.set()
     stop_current_speech()
@@ -247,14 +248,14 @@ def kill_current_mode(
 
 
 # =========================================================
-# CLOUD BACKGROUND WORKER (Updated for Currency Mode)
+# CLOUD BACKGROUND WORKER (Updated for Single GPS Instance)
 # =========================================================
 
-def cloud_monitor_worker(stop_signal, get_threads_func):
+def cloud_monitor_worker(stop_signal, get_threads_func, gps_instance):
     """
     Monitors system state and pushes continuous telemetry to Firebase.
     """
-    gps_instance = GPSInput()
+    # 🔴 Removed local gps_instance instantiation to prevent COM4 lock
 
     while not stop_signal.is_set():
         act_t, det_t, guid_t, curr_t = get_threads_func()
@@ -278,7 +279,7 @@ def cloud_monitor_worker(stop_signal, get_threads_func):
                     gps_on=True
                 )
             else:
-                 update_cloud_status_central(
+                update_cloud_status_central(
                     lat=0,
                     lng=0,
                     status_msg="Waiting for GPS...",
@@ -374,23 +375,26 @@ if __name__ == "__main__":
 
     camera_index = find_external_camera()
 
+    # =====================================================
+    # FIREBASE & GPS MONITORING INITIALIZATION
+    # =====================================================
 
-    # =====================================================
-    # FIREBASE MONITORING INITIALIZATION
-    # =====================================================
-    
+    # 🟢 Create the single, shared Bluetooth/GPS adapter instance here
+    shared_gps = GPSInput()
+
+
     # Lambda function to pass thread objects safely to the cloud worker
     def get_current_threads():
         return active_thread, detection_thread, guidance_thread, currency_thread
 
+
     # Start Central Cloud Monitor
     cloud_thread = threading.Thread(
         target=cloud_monitor_worker,
-        args=(stop_signal, get_current_threads),
+        args=(stop_signal, get_current_threads, shared_gps),  # 🟢 Pass shared_gps here
         daemon=True
     )
     cloud_thread.start()
-
 
     print("\n========================================")
     print("SYSTEM READY")
@@ -447,7 +451,6 @@ if __name__ == "__main__":
                 # =================================================
 
                 if text in ["shutdown", "shut down", "exit system"]:
-
                     stop_signal.set()
                     stop_current_speech()
                     kill_current_mode(
@@ -471,7 +474,6 @@ if __name__ == "__main__":
                 # =================================================
 
                 if text == "smart vision aid":
-
                     kill_current_mode(
                         active_thread,
                         detection_thread,
@@ -767,14 +769,15 @@ if __name__ == "__main__":
                                     priority=1
                                 )
 
-                            # 🟢 FIREBASE SYNC: update_cloud_status_central passed here
+                            # 🟢 FIREBASE SYNC: update_cloud_status_central & shared_gps passed here
                             guidance_thread = threading.Thread(
                                 target=run_guidance,
                                 args=(
                                     stop_signal,
                                     sva_respond,
                                     destination,
-                                    update_cloud_status_central
+                                    update_cloud_status_central,
+                                    shared_gps  # 🟢 Pass shared_gps here
                                 ),
                                 daemon=True
                             )
