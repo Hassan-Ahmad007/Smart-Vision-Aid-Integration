@@ -7,7 +7,7 @@ from imagepreprocessing import preprocess_versions
 from textextractor import extract_text_with_confidence
 from textcleaner import clean_text_with_llm
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\hp\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 
 class TextScanner:
