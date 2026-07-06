@@ -384,21 +384,21 @@ if __name__ == "__main__":
     # =====================================================
 
     # 🟢 Create the single, shared Bluetooth/GPS adapter instance here
-    shared_gps = GPSInput()
-
-
-    # Lambda function to pass thread objects safely to the cloud worker
-    def get_current_threads():
-        return active_thread, detection_thread, guidance_thread, currency_thread
-
-
-    # Start Central Cloud Monitor
-    cloud_thread = threading.Thread(
-        target=cloud_monitor_worker,
-        args=(stop_signal, get_current_threads, shared_gps),  # 🟢 Pass shared_gps here
-        daemon=True
-    )
-    cloud_thread.start()
+    # shared_gps = GPSInput()
+    #
+    #
+    # # Lambda function to pass thread objects safely to the cloud worker
+    # def get_current_threads():
+    #     return active_thread, detection_thread, guidance_thread, currency_thread
+    #
+    #
+    # # Start Central Cloud Monitor
+    # cloud_thread = threading.Thread(
+    #     target=cloud_monitor_worker,
+    #     args=(stop_signal, get_current_threads, shared_gps),  # 🟢 Pass shared_gps here
+    #     daemon=True
+    # )
+    # cloud_thread.start()
 
     print("\n========================================")
     print("SYSTEM READY")
@@ -610,29 +610,46 @@ if __name__ == "__main__":
                     # =================================================
 
                     elif text in [
+
                         "reading",
+
                         "reading mode",
+
                         "switch to reading mode"
+
                     ]:
 
                         if not is_camera_available(camera_index):
                             sva_respond(
+
                                 "External camera is disconnected or unavailable. Please reconnect the camera and try again.",
+
                                 priority=0
+
                             )
+
                             continue
 
                         kill_current_mode(
+
                             active_thread,
+
                             detection_thread,
+
                             guidance_thread,
+
                             currency_thread,
+
                             stop_signal
+
                         )
 
                         active_thread = None
+
                         detection_thread = None
+
                         guidance_thread = None
+
                         currency_thread = None
 
                         stop_signal = threading.Event()
@@ -640,28 +657,31 @@ if __name__ == "__main__":
                         awaiting_mode_selection = False
 
                         sva_respond(
+
                             "Starting reading mode.",
+
                             priority=2
+
                         )
 
                         active_thread = threading.Thread(
+
                             target=run_reading,
-                            args=(
-                                stop_signal,
-                                sva_respond,
-                                camera_index,
-                                reading_busy,
-                                speech_queue,
-                                tts_busy
-                            ),
+
+                            args=(stop_signal, sva_respond, camera_index),
+
                             daemon=True
+
                         )
 
                         active_thread.start()
 
                         mode_running = True
+
                         rec.Reset()
+
                         continue
+
 
                     # =================================================
                     # CURRENCY MODE
@@ -720,96 +740,96 @@ if __name__ == "__main__":
                     # GUIDANCE MODE
                     # =================================================
 
-                    elif text in [
-                        "guidance",
-                        "guidance mode",
-                        "switch to route guidance mode"
-                    ]:
-
-                        kill_current_mode(
-                            active_thread,
-                            detection_thread,
-                            guidance_thread,
-                            currency_thread,
-                            stop_signal
-                        )
-
-                        active_thread = None
-                        detection_thread = None
-                        guidance_thread = None
-                        currency_thread = None
-
-                        stop_signal = threading.Event()
-
-                        awaiting_mode_selection = False
-
-                        sva_respond(
-                            "Please say your destination.",
-                            priority=1
-                        )
-
-                        time.sleep(1.5)
-
-                        destination = get_destination(stream)
-
-                        rec.Reset()
-
-                        if destination:
-
-                            print(f"\nDESTINATION: {destination}")
-
-                            sva_respond(
-                                f"Navigating to {destination}",
-                                priority=1
-                            )
-
-                            if is_camera_available(camera_index):
-
-                                detection_thread = threading.Thread(
-                                    target=run_detection,
-                                    args=(stop_signal, sva_respond, camera_index),
-                                    daemon=True
-                                )
-
-                                detection_thread.start()
-
-                            else:
-
-                                sva_respond(
-                                    "Camera is unavailable. Navigation will continue without obstacle detection.",
-                                    priority=1
-                                )
-
-                            # 🟢 FIREBASE SYNC: update_cloud_status_central & shared_gps passed here
-                            guidance_thread = threading.Thread(
-                                target=run_guidance,
-                                args=(
-                                    stop_signal,
-                                    sva_respond,
-                                    destination,
-                                    update_cloud_status_central,
-                                    shared_gps  # 🟢 Pass shared_gps here
-                                ),
-                                daemon=True
-                            )
-
-                            guidance_thread.start()
-
-                            mode_running = True
-                            rec.Reset()
-                            continue
-
-                        else:
-
-                            awaiting_mode_selection = True
-
-                            sva_respond(
-                                "I could not hear your destination.",
-                                priority=1
-                            )
-
-                            rec.Reset()
-                            continue
+                    # elif text in [
+                    #     "guidance",
+                    #     "guidance mode",
+                    #     "switch to route guidance mode"
+                    # ]:
+                    #
+                    #     kill_current_mode(
+                    #         active_thread,
+                    #         detection_thread,
+                    #         guidance_thread,
+                    #         currency_thread,
+                    #         stop_signal
+                    #     )
+                    #
+                    #     active_thread = None
+                    #     detection_thread = None
+                    #     guidance_thread = None
+                    #     currency_thread = None
+                    #
+                    #     stop_signal = threading.Event()
+                    #
+                    #     awaiting_mode_selection = False
+                    #
+                    #     sva_respond(
+                    #         "Please say your destination.",
+                    #         priority=1
+                    #     )
+                    #
+                    #     time.sleep(1.5)
+                    #
+                    #     destination = get_destination(stream)
+                    #
+                    #     rec.Reset()
+                    #
+                    #     if destination:
+                    #
+                    #         print(f"\nDESTINATION: {destination}")
+                    #
+                    #         sva_respond(
+                    #             f"Navigating to {destination}",
+                    #             priority=1
+                    #         )
+                    #
+                    #         if is_camera_available(camera_index):
+                    #
+                    #             detection_thread = threading.Thread(
+                    #                 target=run_detection,
+                    #                 args=(stop_signal, sva_respond, camera_index),
+                    #                 daemon=True
+                    #             )
+                    #
+                    #             detection_thread.start()
+                    #
+                    #         else:
+                    #
+                    #             sva_respond(
+                    #                 "Camera is unavailable. Navigation will continue without obstacle detection.",
+                    #                 priority=1
+                    #             )
+                    #
+                    #         # 🟢 FIREBASE SYNC: update_cloud_status_central & shared_gps passed here
+                    #         guidance_thread = threading.Thread(
+                    #             target=run_guidance,
+                    #             args=(
+                    #                 stop_signal,
+                    #                 sva_respond,
+                    #                 destination,
+                    #                 update_cloud_status_central,
+                    #                 shared_gps  # 🟢 Pass shared_gps here
+                    #             ),
+                    #             daemon=True
+                    #         )
+                    #
+                    #         guidance_thread.start()
+                    #
+                    #         mode_running = True
+                    #         rec.Reset()
+                    #         continue
+                    #
+                    #     else:
+                    #
+                    #         awaiting_mode_selection = True
+                    #
+                    #         sva_respond(
+                    #             "I could not hear your destination.",
+                    #             priority=1
+                    #         )
+                    #
+                    #         rec.Reset()
+                    #         continue
 
 
     except KeyboardInterrupt:

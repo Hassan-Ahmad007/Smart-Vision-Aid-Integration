@@ -116,7 +116,7 @@ CORRECTED TEXT:
                     "repeat_penalty": 1.15
                 }
             },
-            timeout=60
+            timeout=20
         )
 
         if response.status_code == 200:

@@ -8,7 +8,7 @@ from imagepreprocessing import preprocess_versions
 from textextractor import extract_text_with_confidence
 from textcleaner import clean_text_with_llm
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Users\hp\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 
 class TextScanner:
@@ -86,10 +86,7 @@ def get_best_ocr_text(roi):
 def process_capture(
     captured_roi,
     speak,
-    stop_event,
-    reading_busy,
-    speech_queue,
-    tts_busy
+    stop_event
 ):
     """
     Runs OCR completely independent from
@@ -121,8 +118,6 @@ def process_capture(
         if cleaned:
             speak(cleaned, priority=2)
 
-
-
         else:
             speak(
                 "Text was detected but could not be read clearly.",
@@ -135,20 +130,6 @@ def process_capture(
             "Unable to read clearly. Please bring the page closer.",
             priority=2
         )
-
-    # ---------------------------------------------------
-    # Wait until ALL speech has finished
-    # ---------------------------------------------------
-    while (
-            not stop_event.is_set()
-            and (
-                    not speech_queue.empty()
-                    or tts_busy.is_set()
-            )
-    ):
-        time.sleep(0.1)
-
-    reading_busy.clear()
 
 class OCRWorker:
 
@@ -184,14 +165,7 @@ class OCRWorker:
             self.thread.join(timeout=1)
 
 
-def run_reading(
-    stop_event,
-    sva_respond,
-    camera_index,
-    reading_busy,
-    speech_queue,
-    tts_busy
-):
+def run_reading(stop_event, sva_respond, camera_index):
     def speak(text, priority=2):
         if not stop_event.is_set():
             sva_respond(str(text), priority=priority)
@@ -218,7 +192,7 @@ def run_reading(
 
 
     scan_cooldown = False
-
+    cooldown_start = 0
 
     try:
         while not stop_event.is_set():
@@ -263,47 +237,29 @@ def run_reading(
 
             if scan_cooldown:
 
-                if reading_busy.is_set():
-
+                # Don't allow another capture while OCR is still running
+                if ocr_worker.is_busy():
                     cv2.imshow("SVA - Reading Mode", frame)
-
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         stop_event.set()
-
+                        break
                     continue
 
-                scan_cooldown = False
+                if now - cooldown_start >= 3:
+                    scan_cooldown = False
 
-                scanner.perfect_start_time = None
-                scanner.stable_count = 0
+                    scanner.perfect_start_time = None
+                    scanner.stable_count = 0
 
-                speak("Ready for next text.", priority=2)
+                    speak("Ready for next text.", priority=2)
 
 
-
-            elif (
-
-                    not ocr_worker.is_busy()
-
-                    and not reading_busy.is_set()
-
-            ):
-                if (
-                        not reading_busy.is_set()
-                        and now - last_guidance_time > 6
-                ):
+            elif not ocr_worker.is_busy():
+                if now - last_guidance_time > 6:
                     guide = scanner.guide_user(quality, scanner.stable_count)
                     if guide:
                         speak(guide, priority=3)
                     last_guidance_time = now
-
-                if reading_busy.is_set():
-                    cv2.imshow("SVA - Reading Mode", frame)
-
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
-                        stop_event.set()
-
-                    continue
 
                 # Balanced Threshold adjustments for real-world document feeds
                 ready_to_capture = (quality >= 0.40 and scanner.stable_count >= scanner.stability_threshold)
@@ -319,7 +275,6 @@ def run_reading(
                         speak("Hold still. Capturing text.", priority=2)
 
                     elif now - scanner.perfect_start_time >= 0.5:
-                        reading_busy.set()
                         captured_roi = roi.copy()
 
                         speak("Image captured. You may move the camera.", priority=2)
@@ -328,13 +283,11 @@ def run_reading(
                             process_capture,
                             captured_roi,
                             speak,
-                            stop_event,
-                            reading_busy,
-                            speech_queue,
-                            tts_busy
+                            stop_event
                         )
 
                         scan_cooldown = True
+                        cooldown_start = time.time()
                 else:
                     if scanner.perfect_start_time is not None:
                         print("RESET TIMER")
