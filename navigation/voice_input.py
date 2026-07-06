@@ -9,7 +9,7 @@ def get_destination(stream):
     recognizer.energy_threshold = 300
     recognizer.dynamic_energy_threshold = True
 
-    print("\nGOOGLE DESTINATION MODE")
+    print("\nNavigation MODE")
     print("Listening...")
 
     try:
@@ -42,19 +42,19 @@ def get_destination(stream):
 
         text = recognizer.recognize_google(audio)
 
-        print(f"GOOGLE HEARD: {text}")
+        print(f"Navigation system HEARD: {text}")
 
         return text
 
     except sr.UnknownValueError:
 
-        print("Google could not understand.")
+        print("Navigation system could not understand.")
 
         return None
 
     except sr.RequestError as e:
 
-        print(f"Google API Error: {e}")
+        print(f"Navigation system Error: {e}")
 
         return None
 
