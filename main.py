@@ -119,6 +119,8 @@ speech_queue = PriorityQueue()
 current_tts_process = None
 tts_lock = threading.Lock()
 
+tts_busy = threading.Event()
+reading_busy = threading.Event()
 def speech_worker():
 
     global current_tts_process
@@ -146,6 +148,7 @@ def speech_worker():
             '''
 
             with tts_lock:
+                tts_busy.set()
 
                 current_tts_process = subprocess.Popen(
                     ["powershell", "-Command", command],
@@ -163,6 +166,7 @@ def speech_worker():
 
             with tts_lock:
                 current_tts_process = None
+                tts_busy.clear()
 
             speech_queue.task_done()
 
@@ -535,7 +539,7 @@ if __name__ == "__main__":
                     else:
 
                         sva_respond(
-                            "No mode is running. Say shutdown to close the system.",
+                            "No mode is running. You may exit the system.",
                             priority=2
                         )
 
@@ -640,7 +644,14 @@ if __name__ == "__main__":
 
                         active_thread = threading.Thread(
                             target=run_reading,
-                            args=(stop_signal, sva_respond, camera_index),
+                            args=(
+                                stop_signal,
+                                sva_respond,
+                                camera_index,
+                                reading_busy,
+                                speech_queue,
+                                tts_busy
+                            ),
                             daemon=True
                         )
 

@@ -2,6 +2,7 @@ import cv2
 import pytesseract
 import numpy as np
 import time
+import threading
 
 from imagepreprocessing import preprocess_versions
 from textextractor import extract_text_with_confidence
@@ -66,8 +67,7 @@ def get_best_ocr_text(roi):
 
     gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
-    versions = [("original_gray", gray)]
-    versions.extend(preprocess_versions(roi))
+    versions = preprocess_versions(roi)
 
     for name, processed in versions:
 
@@ -83,13 +83,121 @@ def get_best_ocr_text(roi):
 
     return best_text, best_score
 
+def process_capture(
+    captured_roi,
+    speak,
+    stop_event,
+    reading_busy,
+    speech_queue,
+    tts_busy
+):
+    """
+    Runs OCR completely independent from
+    the live camera loop.
+    """
 
-def run_reading(stop_event, sva_respond, camera_index):
+    if stop_event.is_set():
+        return
+
+
+
+    raw_text, ocr_score = get_best_ocr_text(captured_roi)
+
+    print("\n====================")
+    print("OCR SCORE:", ocr_score)
+    print("RAW TEXT:")
+    print(raw_text)
+    print("====================\n")
+
+    cv2.imwrite("captured_page.jpg", captured_roi)
+
+    if stop_event.is_set():
+        return
+
+    if raw_text:
+
+        cleaned = clean_text_with_llm(raw_text)
+
+        if cleaned:
+            speak(cleaned, priority=2)
+
+
+
+        else:
+            speak(
+                "Text was detected but could not be read clearly.",
+                priority=2
+            )
+
+    else:
+
+        speak(
+            "Unable to read clearly. Please bring the page closer.",
+            priority=2
+        )
+
+    # ---------------------------------------------------
+    # Wait until ALL speech has finished
+    # ---------------------------------------------------
+    while (
+            not stop_event.is_set()
+            and (
+                    not speech_queue.empty()
+                    or tts_busy.is_set()
+            )
+    ):
+        time.sleep(0.1)
+
+    reading_busy.clear()
+
+class OCRWorker:
+
+    def __init__(self):
+        self.thread = None
+        self.processing = False
+
+    def is_busy(self):
+        return self.processing
+
+    def start(self, target, *args):
+        if self.processing:
+            return False
+
+        self.processing = True
+
+        def runner():
+            try:
+                target(*args)
+            finally:
+                self.processing = False
+
+        self.thread = threading.Thread(
+            target=runner,
+            daemon=True
+        )
+
+        self.thread.start()
+        return True
+
+    def stop(self):
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1)
+
+
+def run_reading(
+    stop_event,
+    sva_respond,
+    camera_index,
+    reading_busy,
+    speech_queue,
+    tts_busy
+):
     def speak(text, priority=2):
         if not stop_event.is_set():
             sva_respond(str(text), priority=priority)
 
     scanner = TextScanner()
+    ocr_worker = OCRWorker()
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
     time.sleep(1)
 
@@ -107,12 +215,10 @@ def run_reading(stop_event, sva_respond, camera_index):
     prev_gray = None
     last_guidance_time = 0
 
-    best_roi = None
-    best_quality = 0
+
 
     scan_cooldown = False
-    cooldown_start = 0
-    is_processing = False  # Critical Flag added to avoid multi-triggering loop spam
+
 
     try:
         while not stop_event.is_set():
@@ -138,9 +244,7 @@ def run_reading(stop_event, sva_respond, camera_index):
             prev_gray = roi_gray.copy()
             quality = scanner.calculate_quality(roi_gray)
 
-            if quality > best_quality:
-                best_quality = quality
-                best_roi = roi.copy()
+
 
             # Dynamic Box Color Feedback
             color = (0, 0, 255)
@@ -158,21 +262,48 @@ def run_reading(stop_event, sva_respond, camera_index):
             now = time.time()
 
             if scan_cooldown:
-                if now - cooldown_start >= 3:
-                    scan_cooldown = False
-                    is_processing = False
-                    best_roi = None
-                    best_quality = 0
-                    scanner.perfect_start_time = None
-                    scanner.stable_count = 0
-                    speak("Ready for next text.", priority=2)
 
-            elif not is_processing:
-                if now - last_guidance_time > 6:
+                if reading_busy.is_set():
+
+                    cv2.imshow("SVA - Reading Mode", frame)
+
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        stop_event.set()
+
+                    continue
+
+                scan_cooldown = False
+
+                scanner.perfect_start_time = None
+                scanner.stable_count = 0
+
+                speak("Ready for next text.", priority=2)
+
+
+
+            elif (
+
+                    not ocr_worker.is_busy()
+
+                    and not reading_busy.is_set()
+
+            ):
+                if (
+                        not reading_busy.is_set()
+                        and now - last_guidance_time > 6
+                ):
                     guide = scanner.guide_user(quality, scanner.stable_count)
                     if guide:
                         speak(guide, priority=3)
                     last_guidance_time = now
+
+                if reading_busy.is_set():
+                    cv2.imshow("SVA - Reading Mode", frame)
+
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        stop_event.set()
+
+                    continue
 
                 # Balanced Threshold adjustments for real-world document feeds
                 ready_to_capture = (quality >= 0.40 and scanner.stable_count >= scanner.stability_threshold)
@@ -187,37 +318,23 @@ def run_reading(stop_event, sva_respond, camera_index):
                         scanner.perfect_start_time = now
                         speak("Hold still. Capturing text.", priority=2)
 
-                    elif now - scanner.perfect_start_time >= 1.2:
-                        if best_roi is not None:
-                            is_processing = True  # Locks the loop so it doesn't process frames or say "Hold still" again
-                            speak("Captured. Processing text.", priority=2)
+                    elif now - scanner.perfect_start_time >= 0.5:
+                        reading_busy.set()
+                        captured_roi = roi.copy()
 
-                            # Render current frame step visual update
-                            cv2.imshow("SVA - Reading Mode", frame)
-                            cv2.waitKey(1)
+                        speak("Image captured. You may move the camera.", priority=2)
 
-                            raw_text, ocr_score = get_best_ocr_text(best_roi)
-                            print("\n====================")
-                            print("OCR SCORE:", ocr_score)
-                            print("RAW TEXT:")
-                            print(raw_text)
-                            print("====================\n")
-                            cv2.imwrite("captured_page.jpg", best_roi)
+                        ocr_worker.start(
+                            process_capture,
+                            captured_roi,
+                            speak,
+                            stop_event,
+                            reading_busy,
+                            speech_queue,
+                            tts_busy
+                        )
 
-                            if raw_text:  # Slipped baseline for better accessibility catch
-                                cleaned_text = clean_text_with_llm(raw_text)
-
-                                if cleaned_text:
-                                    speak(cleaned_text, priority=2)
-                                    speak("Reading completed.", priority=2)
-                                else:
-                                    speak("Text was detected but could not be read clearly.", priority=2)
-                            else:
-                                speak("Unable to read clearly. Please bring the page closer and improve lighting.",
-                                      priority=2)
-
-                            scan_cooldown = True
-                            cooldown_start = time.time()
+                        scan_cooldown = True
                 else:
                     if scanner.perfect_start_time is not None:
                         print("RESET TIMER")
@@ -231,6 +348,7 @@ def run_reading(stop_event, sva_respond, camera_index):
                 break
 
     finally:
+        ocr_worker.stop()
         cap.release()
         cv2.destroyAllWindows()
         sva_respond("Reading mode stopped. Goodbye.", priority=2)

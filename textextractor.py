@@ -4,14 +4,37 @@ import numpy as np
 
 
 def clean_ocr_text(text):
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+    """
+    Removes common OCR artifacts while preserving
+    genuine punctuation and document structure.
+    """
 
+    if not text:
+        return ""
+
+    # Normalize spaces
+    text = re.sub(r"\s+", " ", text)
+
+    # Remove common OCR junk symbols
+    text = re.sub(r"[\\|`~]+", " ", text)
+
+    # Remove repeated punctuation
+    text = re.sub(r"([.,;:!?]){2,}", r"\1", text)
+
+    # Remove isolated single-character noise
+    text = re.sub(r"\b[^\w\s]\b", " ", text)
+
+    # Remove isolated random letters
+    text = re.sub(r"\b[a-zA-Z]\b", " ", text)
+
+    # Remove repeated spaces again
+    text = re.sub(r"\s{2,}", " ", text)
+
+    return text.strip()
 
 def extract_text_with_confidence(image):
     configs = [
         "--oem 3 --psm 6",
-        "--oem 3 --psm 11",
         "--oem 3 --psm 3"
     ]
 
@@ -50,7 +73,12 @@ def extract_text_with_confidence(image):
 
             avg_conf = np.mean(confs) if confs else 0
             length_bonus = min(len(text) / 120, 1) * 20
-            score = avg_conf + length_bonus
+            word_count = len(words)
+
+            score = (
+                    avg_conf * 0.75 +
+                    min(word_count, 120) * 0.25
+            )
 
             print("CONFIG:", config)
             print("TEXT:", text)
