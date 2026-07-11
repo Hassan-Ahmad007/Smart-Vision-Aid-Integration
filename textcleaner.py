@@ -1,8 +1,9 @@
+from google import genai
 import re
-import requests
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "gemma3:1b"
+client = genai.Client(api_key="AQ.Ab8RN6L8E6U_Qi7YicYZXTmx-ZRseVWpDc7RQnnC91CFw0euEw")
+
+
 
 
 def basic_clean_text(text):
@@ -41,92 +42,52 @@ def basic_clean_text(text):
     return text.strip()
 
 
-def clean_text_with_llm(raw_text):
-
-    raw_text = basic_clean_text(raw_text)
-
-    if len(raw_text) < 5:
-        return ""
+def clean_text_with_llm(ocr_results):
 
     prompt = f"""
-You are an OCR correction engine for a Smart Vision Aid.
+You are an OCR reconstruction assistant.
 
-The following text was extracted from a PRINTED ENGLISH DOCUMENT using OCR.
+The following text comes from three OCR preprocessing methods
+applied to the SAME image.
 
-Your task is ONLY to repair OCR mistakes.
+Each OCR version recognizes different words correctly.
+
+Compare all versions carefully and reconstruct the original
+text as accurately as possible.
+
+- The three OCR outputs come from the SAME image.
+- Different versions may recognize different words correctly.
+- Prefer words that are consistent across multiple versions.
+- If only one version contains a word but it clearly fits the surrounding context, you may use it.
+- Remove obvious OCR garbage such as random symbols or repeated nonsense fragments.
+- Preserve the original paragraph order.
+- Do not add information that is not present in any OCR version.
 
 Rules:
 
-1. Never invent information.
+- Merge information from all versions.
+- Correct obvious OCR mistakes.
+- Do not summarize.
+- Do not paraphrase.
+- Do not invent new information.
+- Preserve formatting as much as possible.
+- Return only the reconstructed text.
 
-2. Never rewrite sentences.
+OCR Results:
 
-3. Never summarize.
-
-4. Never explain anything.
-
-5. Preserve the original meaning.
-
-6. Preserve paragraphs.
-
-7. Preserve numbered lists.
-
-8. Preserve bullet lists.
-
-9. Remove OCR garbage characters.
-
-10. Remove isolated random symbols.
-
-11. Remove isolated random letters that are clearly OCR noise.
-
-12. Correct obvious spelling mistakes caused by OCR.
-
-13. If a word is truncated, complete it ONLY if the surrounding sentence makes the completion highly certain.
-
-Example:
-
-OCR:
-I would like to express my appreci for your support.
-
-Output:
-I would like to express my appreciation for your support.
-
-Do NOT guess if uncertain.
-
-Return ONLY the corrected text.
-
-OCR TEXT:
-
-{raw_text}
-
-CORRECTED TEXT:
+{ocr_results}
 """
 
     try:
 
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.05,
-                    "top_p": 0.2,
-                    "repeat_penalty": 1.15
-                }
-            },
-            timeout=20
+        response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=prompt
         )
 
-        if response.status_code == 200:
-
-            cleaned = response.json()["response"].strip()
-
-            return basic_clean_text(cleaned)
+        return response.text
 
     except Exception as e:
 
-        print("LLM ERROR:", e)
-
-    return raw_text
+        print("Gemini Error:", e)
+        return None

@@ -44,13 +44,22 @@ class TextScanner:
         return motion < threshold
 
     def calculate_quality(self, roi_gray):
-        blur_score = cv2.Laplacian(roi_gray, cv2.CV_64F).var()
+        # Blur score (higher = sharper)
+        blur_score = cv2.Laplacian(
+            roi_gray,
+            cv2.CV_64F
+        ).var()
+
+        # Contrast score
         contrast_score = roi_gray.std()
 
-        blur_score = min(blur_score / 350.0, 1.0)
-        contrast_score = min(contrast_score / 70.0, 1.0)
+        # Normalize
+        blur_norm = min(blur_score / 350.0, 1.0)
+        contrast_norm = min(contrast_score / 70.0, 1.0)
 
-        return 0.65 * blur_score + 0.35 * contrast_score
+        quality = 0.65 * blur_norm + 0.35 * contrast_norm
+
+        return quality, blur_score, contrast_score
 
     def guide_user(self, quality, stable_count):
         if quality < 0.25:
@@ -60,12 +69,9 @@ class TextScanner:
         return "Hold steady."
 
 
-def get_best_ocr_text(roi):
+def get_all_ocr_results(roi):
 
-    best_text = ""
-    best_score = 0
-
-    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    results = []
 
     versions = preprocess_versions(roi)
 
@@ -77,11 +83,14 @@ def get_best_ocr_text(roi):
         print(f"SCORE: {score}")
         print(f"TEXT: {text}")
 
-        if score > best_score:
-            best_score = score
-            best_text = text
+        results.append({
+            "name": name,
+            "text": text,
+            "score": score
+        })
 
-    return best_text, best_score
+    return results
+
 
 def process_capture(
     captured_roi,
@@ -98,22 +107,34 @@ def process_capture(
 
 
 
-    raw_text, ocr_score = get_best_ocr_text(captured_roi)
+    ocr_results = get_all_ocr_results(captured_roi)
 
-    print("\n====================")
-    print("OCR SCORE:", ocr_score)
-    print("RAW TEXT:")
-    print(raw_text)
-    print("====================\n")
+    prompt = ""
 
-    cv2.imwrite("captured_page.jpg", captured_roi)
+    for result in ocr_results:
+        prompt += (
+            f"\n\n"
+            f"{result['name'].upper()} OCR\n"
+            f"Confidence: {result['score']:.2f}\n"
+            f"{result['text']}"
+        )
+
+    print("\n========== ALL OCR RESULTS ==========")
+    print(prompt)
+    print("=====================================\n")
+
+    timestamp = int(time.time())
+    cv2.imwrite(f"capture_{timestamp}.jpg", captured_roi)
 
     if stop_event.is_set():
         return
 
-    if raw_text:
+    if any(r["text"].strip() for r in ocr_results):
 
-        cleaned = clean_text_with_llm(raw_text)
+        cleaned = clean_text_with_llm(prompt)
+        print("\n========== GEMINI OUTPUT ==========")
+        print(cleaned)
+        print("===================================\n")
 
         if cleaned:
             speak(cleaned, priority=2)
@@ -189,7 +210,14 @@ def run_reading(stop_event, sva_respond, camera_index):
     prev_gray = None
     last_guidance_time = 0
 
+    best_roi = None
+    best_quality = 0
+    best_blur = 0
 
+    # Quality thresholds
+    MIN_QUALITY = 0.40
+    MIN_BLUR = 180
+    MIN_CONTRAST = 25
 
     scan_cooldown = False
     cooldown_start = 0
@@ -216,7 +244,19 @@ def run_reading(stop_event, sva_respond, camera_index):
                 scanner.stable_count = max(scanner.stable_count - 2, 0)
 
             prev_gray = roi_gray.copy()
-            quality = scanner.calculate_quality(roi_gray)
+            quality, blur_score, contrast_score = scanner.calculate_quality(roi_gray)
+
+            # Save only good candidate frames
+            if (
+                    scanner.stable_count > 0
+                    and quality >= MIN_QUALITY
+                    and blur_score >= MIN_BLUR
+                    and contrast_score >= MIN_CONTRAST
+                    and quality > best_quality
+            ):
+                best_quality = quality
+                best_blur = blur_score
+                best_roi = roi.copy()
 
 
 
@@ -230,8 +270,25 @@ def run_reading(stop_event, sva_respond, camera_index):
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
             cv2.putText(frame, "Place text/page inside this box", (x1, y1 - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color,
                         2)
-            cv2.putText(frame, f"Quality: {quality:.2f} | Stable: {scanner.stable_count}/{scanner.stability_threshold}",
-                        (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+            cv2.putText(
+                frame,
+                f"Q:{quality:.2f}  Blur:{blur_score:.0f}  Contrast:{contrast_score:.0f}",
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                color,
+                2
+            )
+
+            cv2.putText(
+                frame,
+                f"Stable: {scanner.stable_count}/{scanner.stability_threshold}",
+                (20, 70),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                color,
+                2
+            )
 
             now = time.time()
 
@@ -250,6 +307,9 @@ def run_reading(stop_event, sva_respond, camera_index):
 
                     scanner.perfect_start_time = None
                     scanner.stable_count = 0
+                    best_roi = None
+                    best_quality = 0
+                    best_blur = 0
 
                     speak("Ready for next text.", priority=2)
 
@@ -262,7 +322,12 @@ def run_reading(stop_event, sva_respond, camera_index):
                     last_guidance_time = now
 
                 # Balanced Threshold adjustments for real-world document feeds
-                ready_to_capture = (quality >= 0.40 and scanner.stable_count >= scanner.stability_threshold)
+                ready_to_capture = (
+                        quality >= MIN_QUALITY
+                        and blur_score >= MIN_BLUR
+                        and contrast_score >= MIN_CONTRAST
+                        and scanner.stable_count >= scanner.stability_threshold
+                )
                 print(
                     f"Quality={quality:.2f} "
                     f"Stable={scanner.stable_count} "
@@ -275,9 +340,17 @@ def run_reading(stop_event, sva_respond, camera_index):
                         speak("Hold still. Capturing text.", priority=2)
 
                     elif now - scanner.perfect_start_time >= 0.5:
-                        captured_roi = roi.copy()
+                        if best_roi is not None:
+                            captured_roi = best_roi.copy()
+                        else:
+                            captured_roi = roi.copy()
 
                         speak("Image captured. You may move the camera.", priority=2)
+
+                        print("\n===== CAPTURE INFO =====")
+                        print(f"Best Quality : {best_quality:.2f}")
+                        print(f"Best Blur    : {best_blur:.0f}")
+                        print("========================\n")
 
                         ocr_worker.start(
                             process_capture,
