@@ -91,6 +91,39 @@ def get_all_ocr_results(roi):
 
     return results
 
+def select_best_frame(frame_buffer):
+    """
+    Select the sharpest frame from the buffered candidates.
+
+    Blur is given the highest priority because OCR accuracy depends
+    much more on sharpness than on overall image quality.
+    """
+
+    if not frame_buffer:
+        return None
+
+    best_frame = None
+    best_score = -1
+
+    for frame in frame_buffer:
+
+        score = (
+            frame["blur"] * 0.70 +
+            frame["quality"] * 300 * 0.20 +
+            frame["contrast"] * 0.10
+        )
+
+        if score > best_score:
+            best_score = score
+            best_frame = frame
+
+    print("\n===== BEST FRAME SELECTED =====")
+    print(f"Blur      : {best_frame['blur']:.0f}")
+    print(f"Quality   : {best_frame['quality']:.2f}")
+    print(f"Contrast  : {best_frame['contrast']:.0f}")
+    print("===============================\n")
+
+    return best_frame["roi"]
 
 def process_capture(
     captured_roi,
@@ -210,9 +243,10 @@ def run_reading(stop_event, sva_respond, camera_index):
     prev_gray = None
     last_guidance_time = 0
 
-    best_roi = None
-    best_quality = 0
-    best_blur = 0
+    # Best frame candidates collected during the capture window
+    frame_buffer = []
+
+
 
     # Quality thresholds
     MIN_QUALITY = 0.40
@@ -246,17 +280,7 @@ def run_reading(stop_event, sva_respond, camera_index):
             prev_gray = roi_gray.copy()
             quality, blur_score, contrast_score = scanner.calculate_quality(roi_gray)
 
-            # Save only good candidate frames
-            if (
-                    scanner.stable_count > 0
-                    and quality >= MIN_QUALITY
-                    and blur_score >= MIN_BLUR
-                    and contrast_score >= MIN_CONTRAST
-                    and quality > best_quality
-            ):
-                best_quality = quality
-                best_blur = blur_score
-                best_roi = roi.copy()
+
 
 
 
@@ -307,9 +331,9 @@ def run_reading(stop_event, sva_respond, camera_index):
 
                     scanner.perfect_start_time = None
                     scanner.stable_count = 0
-                    best_roi = None
-                    best_quality = 0
-                    best_blur = 0
+                    frame_buffer.clear()
+
+
 
                     speak("Ready for next text.", priority=2)
 
@@ -334,22 +358,36 @@ def run_reading(stop_event, sva_respond, camera_index):
                     f"Ready={ready_to_capture}"
                 )
                 if ready_to_capture:
+
                     if scanner.perfect_start_time is None:
+
                         print("START TIMER")
+
                         scanner.perfect_start_time = now
+
+                        frame_buffer.clear()
+
                         speak("Hold still. Capturing text.", priority=2)
 
-                    elif now - scanner.perfect_start_time >= 0.5:
-                        if best_roi is not None:
-                            captured_roi = best_roi.copy()
-                        else:
+                    else:
+
+                        frame_buffer.append({
+                            "roi": roi.copy(),
+                            "quality": quality,
+                            "blur": blur_score,
+                            "contrast": contrast_score
+                        })
+                    print(f"Collected {len(frame_buffer)} candidate frames")
+                    if now - scanner.perfect_start_time >= 0.5:
+                        captured_roi = select_best_frame(frame_buffer)
+
+                        if captured_roi is None:
                             captured_roi = roi.copy()
 
                         speak("Image captured. You may move the camera.", priority=2)
 
                         print("\n===== CAPTURE INFO =====")
-                        print(f"Best Quality : {best_quality:.2f}")
-                        print(f"Best Blur    : {best_blur:.0f}")
+                        print(f"Frames Collected : {len(frame_buffer)}")
                         print("========================\n")
 
                         ocr_worker.start(
