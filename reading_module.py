@@ -39,7 +39,7 @@ class TextScanner:
 
         motion = np.mean(diff)
 
-        print(f"Motion={motion:.2f}")
+        # print(f"Motion={motion:.2f}")
 
         return motion < threshold
 
@@ -131,7 +131,7 @@ def process_capture(
     stop_event
 ):
     """
-    Runs OCR completely independent from
+    Runs OCR completely independent of
     the live camera loop.
     """
 
@@ -264,6 +264,12 @@ def run_reading(stop_event, sva_respond, camera_index):
                 speak("Camera connection lost. Reading mode stopped.", priority=0)
                 break
 
+            # ======================================================
+            # Pause all scanning while OCR/Gemini is processing
+            # ======================================================
+
+            processing = ocr_worker.is_busy()
+
             frame_h, frame_w = frame.shape[:2]
             x1, y1, x2, y2 = scanner.get_reading_box(frame_w, frame_h)
 
@@ -294,25 +300,49 @@ def run_reading(stop_event, sva_respond, camera_index):
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
             cv2.putText(frame, "Place text/page inside this box", (x1, y1 - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color,
                         2)
-            cv2.putText(
-                frame,
-                f"Q:{quality:.2f}  Blur:{blur_score:.0f}  Contrast:{contrast_score:.0f}",
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                color,
-                2
-            )
+            if ocr_worker.is_busy():
 
-            cv2.putText(
-                frame,
-                f"Stable: {scanner.stable_count}/{scanner.stability_threshold}",
-                (20, 70),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                color,
-                2
-            )
+                cv2.putText(
+                    frame,
+                    "Processing captured image...",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 255),
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    "Please wait...",
+                    (20, 75),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 255),
+                    2
+                )
+
+            else:
+
+                cv2.putText(
+                    frame,
+                    f"Q:{quality:.2f}  Blur:{blur_score:.0f}  Contrast:{contrast_score:.0f}",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    color,
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    f"Stable: {scanner.stable_count}/{scanner.stability_threshold}",
+                    (20, 70),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    color,
+                    2
+                )
 
             now = time.time()
 
@@ -338,7 +368,8 @@ def run_reading(stop_event, sva_respond, camera_index):
                     speak("Ready for next text.", priority=2)
 
 
-            elif not ocr_worker.is_busy():
+
+            elif not processing:
                 if now - last_guidance_time > 6:
                     guide = scanner.guide_user(quality, scanner.stable_count)
                     if guide:
@@ -352,16 +383,16 @@ def run_reading(stop_event, sva_respond, camera_index):
                         and contrast_score >= MIN_CONTRAST
                         and scanner.stable_count >= scanner.stability_threshold
                 )
-                print(
-                    f"Quality={quality:.2f} "
-                    f"Stable={scanner.stable_count} "
-                    f"Ready={ready_to_capture}"
-                )
+                # print(
+                #     f"Quality={quality:.2f} "
+                #     f"Stable={scanner.stable_count} "
+                #     f"Ready={ready_to_capture}"
+                # )
                 if ready_to_capture:
 
                     if scanner.perfect_start_time is None:
 
-                        print("START TIMER")
+                        print("\n[Reading] Document detected. Starting capture...")
 
                         scanner.perfect_start_time = now
 
@@ -400,8 +431,8 @@ def run_reading(stop_event, sva_respond, camera_index):
                         scan_cooldown = True
                         cooldown_start = time.time()
                 else:
-                    if scanner.perfect_start_time is not None:
-                        print("RESET TIMER")
+                    # if scanner.perfect_start_time is not None:
+                    #     print("RESET TIMER")
 
                     scanner.perfect_start_time = None
 
