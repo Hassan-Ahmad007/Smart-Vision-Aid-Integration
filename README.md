@@ -1,131 +1,189 @@
 # Smart Vision Aid (SVA)
 
-## An Intelligent Assistive System for Visually Impaired Users
+### AI Powered Assistive System for Visually Impaired Users
 
-Smart Vision Aid (SVA) is an AI powered assistive technology project designed to help visually impaired individuals move more safely and independently in their daily lives.
+Smart Vision Aid (SVA) is a Python based assistive system designed to help visually impaired users understand their surroundings and perform everyday tasks more independently.
 
-The system combines **computer vision, artificial intelligence, OCR, currency recognition, GPS based navigation, obstacle detection, voice interaction, and sensor based feedback** into a single assistive platform.
-
-SVA is designed around a simple idea:
-
-> **Give visually impaired users more information about their surroundings through voice and tactile feedback, without requiring constant interaction with a smartphone or computer screen.**
-
-The project was developed as a Final Year Project by students of Computer Science under the supervision of **Miss Sadaf Mehmood**.
+The system combines **voice control, computer vision, OCR, currency recognition, GPS based navigation, and obstacle detection** into a single assistive platform. Information is communicated primarily through voice feedback, while vibration feedback is used for obstacle warnings.
 
 ---
 
-## Project Overview
+## 📋 Table of Contents
 
-Visually impaired individuals face several challenges in everyday activities, including:
+1. [Overview](#overview)
+2. [Problem Statement](#problem-statement)
+3. [Objectives](#objectives)
+4. [Who Is It For](#who-is-it-for)
+5. [Key Features](#key-features)
+6. [How It Works](#how-it-works)
+7. [System Modules](#system-modules)
+8. [Technology Stack](#technology-stack)
+9. [System Architecture](#system-architecture)
+10. [Project Structure](#project-structure)
+11. [Installation](#installation)
+12. [Configuration](#configuration)
+13. [Usage](#usage)
+14. [Example Workflows](#example-workflows)
+15. [Safety and Limitations](#safety-and-limitations)
+16. [Future Improvements](#future-improvements)
+17. [License](#license)
 
-* Detecting obstacles in their path
-* Identifying objects around them
-* Reading printed text, signs, and documents
+---
+
+## Overview
+
+Visually impaired users can face difficulties with:
+
+* Detecting obstacles
+* Understanding objects in their surroundings
+* Reading printed text
 * Recognizing currency
-* Navigating to unfamiliar locations
-* Maintaining awareness of their surroundings
-* Getting assistance during unsafe situations
+* Navigating unfamiliar locations
+* Receiving useful information while walking
 
-Traditional white canes and basic smart sticks can help detect nearby obstacles, but they generally cannot understand what the obstacle is, read text, recognize currency, or provide route guidance.
+Traditional mobility aids can provide physical obstacle detection, but they generally don't provide information about **what an object is, what text says, what currency is being held, or where the user should go**.
 
-Smart Vision Aid addresses these limitations by combining multiple assistive technologies into one system.
+Smart Vision Aid addresses these challenges by combining multiple assistive technologies into one system.
 
-The project consists of a **smart stick and processing system**, supported by AI based software modules and hardware sensors.
+The user interacts with SVA mainly through **voice commands**. Depending on the selected mode, the system uses its camera, AI models, OCR, GPS, and sensors to process the environment and provide useful feedback.
 
 ---
 
-## Who Is SVA For?
+## Problem Statement
+
+Visually impaired individuals often depend on multiple tools for different everyday tasks.
+
+A traditional white cane can help detect physical obstacles, but it doesn't identify objects, read documents, recognize banknotes, or provide route guidance.
+
+Smart Vision Aid aims to bring these capabilities together into a single assistive system.
+
+The project focuses on improving:
+
+* Mobility
+* Environmental awareness
+* Accessibility
+* Independence
+* Safety
+
+---
+
+## Objectives
+
+The main objectives of Smart Vision Aid are:
+
+* Detect and identify objects in the user's surroundings.
+* Read printed text and documents using OCR.
+* Recognize Pakistani currency denominations.
+* Count multiple currency notes and calculate their total.
+* Provide GPS based route guidance.
+* Detect nearby obstacles using ultrasonic sensors.
+* Provide voice based interaction and feedback.
+* Provide vibration based obstacle alerts.
+* Support location and system monitoring through cloud services.
+* Reduce the need for constant interaction with a smartphone or graphical interface.
+
+---
+
+## Who Is It For?
 
 Smart Vision Aid is primarily designed for:
 
-* People with partial or complete visual impairment
-* Visually impaired users who need assistance with mobility and environmental awareness
-* Caregivers and family members who want to monitor a user's safety
-* Rehabilitation centers
-* Assistive technology organizations
-* Researchers and students working on accessible AI and embedded systems
+* Visually impaired users
+* Users with partial or complete vision loss
+* People who need assistance with environmental awareness and mobility
+* Caregivers and family members
+* Assistive technology researchers and developers
 
 ---
 
-## Key Features
+# Key Features
 
-### 1. Voice Controlled Interface
+## 🎙️ Voice Controlled Interface
 
-The system is controlled primarily through voice commands.
+SVA provides a hands free voice interface for controlling the system.
 
-Users can activate the system and select different modes using natural voice commands such as:
+The voice system uses **Vosk** for speech recognition and text to speech for communicating responses.
+
+The user can activate the system and select different modes using voice commands.
+
+Example commands include:
 
 ```text
 Activate
-
 Reading mode
-
 Detection mode
-
 Currency mode
-
-Stop mode
-
+Stop
 Shutdown
 ```
 
-The current implementation uses **Vosk** for offline speech recognition and a **text to speech system** for spoken responses.
+This allows the user to interact with the system without depending on a screen or keyboard.
 
 ---
 
-### 2. Real Time Object Detection
+## 👁️ Object Detection
 
-SVA uses **YOLOv8** and a camera to identify objects in the user's surroundings.
+The Object Detection module uses **YOLOv8** and a camera to identify objects in the user's surroundings.
 
-The object detection module:
+The module includes processing techniques to improve the reliability of detections.
 
-* Captures live camera frames
-* Runs YOLOv8 object detection
-* Filters detections using a confidence threshold
-* Tracks detections across multiple frames
-* Uses a voting mechanism to confirm objects
-* Announces confirmed objects through voice
-* Uses a speech cooldown to prevent repeated announcements
+It uses:
 
-For example, after confirming an object, the system can provide an audio message such as:
+* Confidence thresholding
+* Frame skipping
+* Detection history
+* Multi frame voting
+* Confirmed object detection
+* Speech cooldown
+
+Instead of immediately announcing every detection, the system checks detections across multiple frames and uses voting to confirm an object.
+
+This helps reduce unstable detections and unnecessary repeated announcements.
+
+### Object Detection Workflow
 
 ```text
-Person ahead
+Camera
+   ↓
+Frame Capture
+   ↓
+YOLOv8 Detection
+   ↓
+Confidence Filtering
+   ↓
+Detection History
+   ↓
+Multi Frame Voting
+   ↓
+Confirmed Object
+   ↓
+Voice Feedback
 ```
-
-The system also displays bounding boxes and detection information during operation.
 
 ---
 
-### 3. Reading and OCR
+## 📖 Reading and OCR
 
-The Reading Mode allows the user to read printed documents, signs, labels, and other text.
+Reading Mode allows the user to capture and listen to printed text.
 
-The system uses:
+The system uses **OpenCV, Tesseract OCR, and Gemini based text cleaning**.
 
-* OpenCV
-* Image preprocessing
-* Tesseract OCR
-* OCR confidence evaluation
-* Image quality analysis
+Before performing OCR, the system checks whether the document is sufficiently stable and clear.
+
+The processing includes:
+
+* Image quality evaluation
+* Sharpness detection
+* Contrast evaluation
 * Frame stability detection
 * Best frame selection
+* Image preprocessing
+* Tesseract OCR
+* OCR result processing
 * Gemini based text cleaning
+* Voice output
 
-The reading process works by first checking whether the document is stable and clear enough to capture.
-
-The system evaluates:
-
-* Sharpness
-* Contrast
-* Image quality
-* Frame stability
-
-Once a suitable frame is captured, multiple preprocessing versions are generated and passed through OCR.
-
-The extracted text is then processed and cleaned before being converted into speech.
-
-### Reading Pipeline
+### Reading Workflow
 
 ```text
 Camera
@@ -149,17 +207,17 @@ Gemini Text Cleaning
 Voice Output
 ```
 
-This approach helps reduce errors caused by blurry, unstable, or poorly captured images.
+This process is intended to improve the quality of the text before it is communicated to the user.
 
 ---
 
-### 4. Pakistani Currency Recognition and Counting
+## 💵 Pakistani Currency Recognition
 
 SVA includes a dedicated currency recognition module for Pakistani banknotes.
 
-The module uses a custom trained YOLO model to recognize supported denominations.
+The system uses a custom trained YOLO model to recognize currency denominations.
 
-Currently supported denominations include:
+Supported denominations in the current implementation are:
 
 ```text
 Rs. 10
@@ -172,7 +230,7 @@ Rs. 1000
 Rs. 5000
 ```
 
-The system doesn't simply recognize the note. It also maintains a running total.
+The module can recognize a note and maintain a running total.
 
 For example:
 
@@ -184,7 +242,7 @@ Rs. 500 added
 Total = Rs. 500
 ```
 
-If the user then shows another Rs. 1000 note:
+If another Rs. 1000 note is shown:
 
 ```text
 Rs. 1000 detected
@@ -194,14 +252,20 @@ Rs. 1000 added
 Total = Rs. 1500
 ```
 
-To prevent the same banknote from being counted repeatedly, the system waits until the current note is removed before accepting the next note.
+### Duplicate Counting Prevention
 
-### Currency Recognition Pipeline
+The system doesn't continuously add the same banknote while it remains in front of the camera.
+
+After recognizing a note, the module waits until the note is removed before allowing another note to be counted.
+
+This helps prevent accidental repeated counting.
+
+### Currency Workflow
 
 ```text
 Camera
    ↓
-YOLO Currency Model
+Currency YOLO Model
    ↓
 Denomination Detection
    ↓
@@ -209,9 +273,9 @@ Confidence Filtering
    ↓
 Duplicate Detection Removal
    ↓
-Stable Frame Verification
+Stable Detection
    ↓
-Currency Amount
+Denomination Identification
    ↓
 Running Total
    ↓
@@ -220,33 +284,42 @@ Voice Feedback
 
 ---
 
-### 5. GPS Route Guidance
+## 🧭 Route Guidance
 
-The navigation module is designed to provide voice based route guidance.
+The Route Guidance module is designed to provide voice based navigation.
 
-The intended workflow is:
+The navigation workflow includes:
+
+* Voice based destination input
+* GPS location
+* Destination geocoding
+* Route calculation
+* Route processing
+* Position tracking
+* Navigation instructions
+* Voice feedback
+
+### Navigation Workflow
 
 ```text
-Voice Destination
-       ↓
+Destination
+     ↓
 Current GPS Location
-       ↓
+     ↓
 Destination Geocoding
-       ↓
+     ↓
 Route Calculation
-       ↓
+     ↓
 Route Processing
-       ↓
+     ↓
 GPS Tracking
-       ↓
-Navigation Instructions
-       ↓
+     ↓
+Turn Instructions
+     ↓
 Voice Feedback
 ```
 
-The navigation system obtains the user's current coordinates and calculates a route to the selected destination.
-
-It then tracks the user's movement and provides navigation instructions such as:
+The system can provide instructions such as:
 
 ```text
 Go straight for 100 meters.
@@ -254,19 +327,17 @@ Turn right.
 Turn left.
 ```
 
-The navigation module is designed to work with the GPS hardware used by the project.
-
 ---
 
-### 6. Obstacle Detection
+## 🚨 Obstacle Detection
 
-The project documentation also defines a hardware based obstacle detection system using ultrasonic sensors.
+The project includes hardware based obstacle detection using ultrasonic sensors.
 
-The ultrasonic sensors are intended to detect obstacles within the user's walking path.
+The ultrasonic sensors are intended to detect obstacles in the user's walking path.
 
-The system can provide tactile feedback through vibration motors when an obstacle is detected.
+When an obstacle is detected, the system can provide tactile feedback through a vibration motor.
 
-According to the project requirements, the ultrasonic system is designed around a detection range of approximately:
+The project documentation specifies an approximate detection range of:
 
 ```text
 30 cm to 300 cm
@@ -276,289 +347,199 @@ This provides an additional safety layer alongside camera based object detection
 
 ---
 
-### 7. Dual Feedback
+## 🔊 Audio and Vibration Feedback
 
-SVA is designed to provide feedback through two main channels:
+SVA uses two main feedback methods.
 
-**Audio feedback**
+### Voice Feedback
 
-Used for:
+Voice output is used for:
 
-* Object descriptions
+* Object detection results
 * OCR results
-* Currency results
+* Currency recognition
+* Currency totals
 * Navigation instructions
 * System status
 * Warnings
 
-**Vibration feedback**
+### Vibration Feedback
 
-Used for:
+Vibration is mainly used for:
 
 * Nearby obstacle warnings
 * Tactile safety alerts
 
-This combination allows the user to receive information without relying entirely on audio.
+Using both audio and tactile feedback allows the system to communicate information without requiring visual interaction.
 
 ---
 
-### 8. Guardian Monitoring
+## ☁️ Guardian and Cloud Monitoring
 
-The project documentation includes a guardian monitoring system intended to provide caregivers with information about the user's safety and location.
+The project architecture includes cloud based monitoring using **Firebase Realtime Database**.
 
-The system is designed to support:
+The monitoring system is designed to support information such as:
 
-* Live location monitoring
+* Current location
 * GPS status
 * Camera status
 * System status
 * Error status
-* Safety monitoring
-* Emergency notifications
+* Heartbeat information
 
-Firebase Realtime Database is used in the software architecture for cloud based status and location information.
-
-The current codebase contains the Firebase integration and cloud monitoring logic, although some of the monitoring and navigation integration is currently disabled/commented in `main.py`.
+This functionality is intended to provide caregivers or guardians with additional awareness of the user's system and location status.
 
 ---
 
-## How the System Works
+# How It Works
 
-The overall system follows a modular architecture.
+The overall SVA workflow can be represented as:
 
 ```text
-                    SMART VISION AID
-                           │
-                           ▼
-                    Voice Controller
-                         main.py
-                           │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-        ▼                  ▼                  ▼
-   Voice Input         Mode Manager       Voice Output
-      Vosk              Threading           TTS Queue
-        │                  │                  │
-        └──────────────────┼──────────────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-          ▼                ▼                ▼
-   Object Detection      Reading         Currency
-      YOLOv8             OCR              YOLO
-          │                │                │
-          │             Tesseract          │
-          │                │                │
-          │             Gemini              │
-          │                │                │
-          └────────────────┼────────────────┘
-                           │
-                           ▼
-                    Route Guidance
-                       GPS + Maps
-                           │
-                           ▼
-                   User Feedback
-                 Audio + Vibration
+                 USER
+                   │
+                   ▼
+             Voice Command
+                   │
+                   ▼
+          Voice Recognition
+                Vosk
+                   │
+                   ▼
+            Mode Selection
+                   │
+        ┌──────────┼──────────┐
+        │          │          │
+        ▼          ▼          ▼
+    Detection    Reading   Currency
+        │          │          │
+      YOLO       OCR        YOLO
+        │          │          │
+        └──────────┼──────────┘
+                   │
+                   ▼
+             Route Guidance
+                GPS / Maps
+                   │
+                   ▼
+             Result Processing
+                   │
+          ┌────────┴────────┐
+          │                 │
+          ▼                 ▼
+      Voice Output     Vibration
 ```
 
-The system is divided into independent modules so that each major functionality can be developed, tested, and maintained separately.
+The central controller manages the system and starts the appropriate module based on the user's voice command.
 
 ---
 
-## System Workflow
+# System Modules
 
-A typical interaction with SVA follows this process:
-
-### Step 1: System Activation
-
-The user says:
-
-```text
-Activate
-```
-
-The voice controller recognizes the command and activates SVA.
-
-The system responds:
-
-```text
-Smart Vision Aid activated. Please select your mode.
-```
-
-### Step 2: Mode Selection
-
-The user selects a mode using voice.
-
-For example:
-
-```text
-Detection mode
-```
-
-or:
-
-```text
-Reading mode
-```
-
-or:
-
-```text
-Currency mode
-```
-
-### Step 3: Camera Verification
-
-Before starting a camera based module, the system checks whether the external camera is available.
-
-### Step 4: Module Execution
-
-The selected module runs in its own thread.
-
-This allows the main voice controller to remain responsive.
-
-### Step 5: Processing
-
-The selected AI or computer vision pipeline processes camera or sensor data.
-
-### Step 6: Feedback
-
-The result is communicated to the user using audio and, where applicable, vibration feedback.
-
-### Step 7: Stop or Switch Mode
-
-The user can say:
-
-```text
-Stop
-```
-
-to stop the current mode and return to mode selection.
-
-The system can also be shut down using:
-
-```text
-Shutdown
-```
+| Module               | Main Purpose                         | Main Technologies         |
+| -------------------- | ------------------------------------ | ------------------------- |
+| Voice Control        | Voice commands and system management | Vosk, PyAudio             |
+| Object Detection     | Identify surrounding objects         | YOLOv8, OpenCV            |
+| Reading / OCR        | Read printed text                    | OpenCV, Tesseract, Gemini |
+| Currency Recognition | Recognize Pakistani banknotes        | YOLO, OpenCV              |
+| Currency Counting    | Calculate total value                | Python, Computer Vision   |
+| Route Guidance       | Provide navigation instructions      | GPS, Geocoding, Routing   |
+| Obstacle Detection   | Detect nearby obstacles              | Ultrasonic Sensors        |
+| Feedback             | Communicate results                  | TTS, Vibration            |
+| Guardian Monitoring  | Location and system monitoring       | Firebase                  |
 
 ---
 
-## System Modules
+# Technology Stack
 
-| Module               | Purpose                                | Main Technologies             |
-| -------------------- | -------------------------------------- | ----------------------------- |
-| Voice Control        | Voice commands and system control      | Vosk, PyAudio                 |
-| Object Detection     | Identify objects around the user       | YOLOv8, OpenCV                |
-| Reading              | Read printed text                      | OpenCV, Tesseract OCR, Gemini |
-| Currency Recognition | Recognize and count Pakistani currency | YOLO, OpenCV                  |
-| Route Guidance       | Provide destination based navigation   | GPS, Geocoding, Routing       |
-| Obstacle Detection   | Detect nearby obstacles                | Ultrasonic Sensors            |
-| Feedback             | Communicate results to the user        | TTS, Vibration                |
-| Guardian Monitoring  | Monitor location and system status     | Firebase                      |
-
----
-
-## Hardware
-
-The project documentation specifies the following hardware components:
-
-* Arduino
-* GPS module
-* Bluetooth module
-* Ultrasonic sensors
-* Vibration motor
-* Camera
-* Laptop or processing unit
-
-The smart stick provides the physical platform for the sensors and feedback components, while the processing unit handles the computationally intensive AI and vision tasks.
-
----
-
-## Software and Technologies
-
-### Programming Language
+## Programming Language
 
 * Python
 
-### Artificial Intelligence and Computer Vision
+## Artificial Intelligence and Computer Vision
 
 * YOLOv8
 * Ultralytics
 * OpenCV
-* Tesseract OCR
 * Custom trained YOLO currency model
 
-### Speech
+## OCR and Text Processing
+
+* Tesseract OCR
+* Gemini
+
+## Speech Processing
 
 * Vosk
 * PyAudio
-* Windows System.Speech
-* Text to Speech
+* Windows Speech Synthesis
 
-### Natural Language Processing
+## Navigation
 
-* Gemini based text cleaning for OCR results
-
-### Navigation
-
-* GPS hardware
+* GPS
 * Geocoding
 * Route calculation
 * Route tracking
 
-### Hardware Communication
+## Hardware
 
+* Camera
 * Arduino
-* Bluetooth
-* Ultrasonic sensors
 * GPS module
+* Ultrasonic sensors
+* Bluetooth module
 * Vibration motor
 
-### Cloud
+## Cloud
 
 * Firebase Realtime Database
 
 ---
 
-## Project Architecture
+# System Architecture
 
-The project follows a modular architecture.
-
-The central controller is responsible for:
-
-* Voice recognition
-* Mode selection
-* Thread management
-* Camera management
-* Speech queue management
-* System shutdown
-* Module switching
-
-Individual modules handle their own processing.
-
-### Main Software Modules
+The project uses a modular architecture where `main.py` acts as the central controller.
 
 ```text
-main.py
-│
-├── vision_module.py
-│
-├── reading_module.py
-│
-├── currency_module.py
-│
-└── navigation/
-    └── route_guidance.py
+                         SMART VISION AID
+                                │
+                                ▼
+                         Voice Controller
+                             main.py
+                                │
+             ┌──────────────────┼──────────────────┐
+             │                  │                  │
+             ▼                  ▼                  ▼
+        Voice Input        Mode Manager       Voice Output
+           Vosk               Threads              TTS
+             │                  │                  │
+             └──────────────────┼──────────────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              │                 │                 │
+              ▼                 ▼                 ▼
+        Object Detection      Reading          Currency
+           YOLOv8               OCR               YOLO
+              │                 │                 │
+              │              Tesseract            │
+              │              Gemini               │
+              │                 │                 │
+              └─────────────────┼─────────────────┘
+                                │
+                                ▼
+                         Route Guidance
+                            GPS + Maps
+                                │
+                                ▼
+                         User Feedback
+                      Voice + Vibration
 ```
-
-The navigation system also contains supporting components for destination input, GPS input, route processing, tracking, geocoding, and route calculation.
 
 ---
 
-## Project Structure
+# Project Structure
 
-A simplified project structure is:
+A simplified structure of the main software components is:
 
 ```text
 Smart-Vision-Aid/
@@ -567,598 +548,414 @@ Smart-Vision-Aid/
 ├── vision_module.py
 ├── reading_module.py
 ├── currency_module.py
+├── route_guidance.py
 │
-├── navigation/
-│   ├── route_guidance.py
-│   ├── gps_input.py
-│   ├── voice_input.py
-│   ├── navigation_api.py
-│   ├── route_processor.py
-│   └── tracker.py
-│
-├── imagepreprocessing.py
-├── textextractor.py
-├── textcleaner.py
-│
-├── model/
-│
-├── best.pt
-├── yolov8n.pt
-│
-├── serviceAccountKey.json
+├── models/
+│   ├── yolov8n.pt
+│   └── best.pt
 │
 ├── requirements.txt
-│
 └── README.md
 ```
 
-The exact contents of the repository may vary depending on the deployment and configuration environment.
+Additional configuration, model, navigation, and supporting files may be present depending on the project setup.
+
+### Main Files
+
+| File                 | Purpose                                              |
+| -------------------- | ---------------------------------------------------- |
+| `main.py`            | Central controller and voice based system management |
+| `vision_module.py`   | Real time object detection                           |
+| `reading_module.py`  | Document capture and OCR processing                  |
+| `currency_module.py` | Pakistani currency recognition and counting          |
+| `route_guidance.py`  | GPS based navigation and route guidance              |
 
 ---
 
-## Object Detection Processing
+# Installation
 
-The object detection module uses a lightweight YOLOv8 model and processes selected frames rather than performing inference on every frame.
+## Requirements
 
-The implementation uses:
+Before running SVA, make sure the required software and hardware are available.
 
-* Confidence thresholding
-* Frame skipping
-* Detection history
-* Multi frame voting
-* Top detection selection
-* Speech cooldown
+### Software
 
-The voting mechanism helps confirm that an object is consistently visible before announcing it.
-
-This is particularly important for assistive applications where repeatedly announcing unstable detections could make the system difficult to use.
-
----
-
-## OCR Processing
-
-The Reading Mode includes several stages before the final speech output.
-
-### Image Quality
-
-The system calculates:
-
-* Blur score
-* Contrast score
-* Overall quality
-
-### Stability
-
-The system compares consecutive frames to determine whether the document is sufficiently stable.
-
-### Capture
-
-When the page meets the required quality and stability thresholds, candidate frames are collected.
-
-The sharpest suitable frame is selected for OCR.
-
-### OCR
-
-Multiple preprocessing versions are passed through the OCR pipeline.
-
-### Text Cleaning
-
-The resulting OCR text is passed to the text cleaning component, which uses Gemini to improve the final text before speech output.
-
----
-
-## Currency Counting Logic
-
-Currency recognition uses a custom YOLO model.
-
-The module performs:
-
-1. Camera capture
-2. Currency detection
-3. Confidence filtering
-4. Bounding box processing
-5. Duplicate removal using IoU
-6. Stable detection verification
-7. Denomination extraction
-8. Total calculation
-9. Voice announcement
-10. Waiting for note removal
-
-The note removal state is important because it prevents a single banknote from being counted multiple times while it remains in the camera view.
-
----
-
-## Voice Control
-
-The voice controller uses a predefined Vosk grammar containing supported commands.
-
-Examples include:
-
-```text
-activate
-smart vision aid
-switch to reading mode
-switch to detection mode
-switch to currency mode
-reading mode
-detection mode
-currency mode
-currency
-count currency
-money mode
-stop
-stop mode
-shutdown
-shut down
-exit system
-```
-
-This constrained command vocabulary makes the voice interface more predictable and suitable for hands free operation.
-
----
-
-## Speech Priority System
-
-SVA uses a priority queue for speech output.
-
-Different messages can be assigned different priorities.
-
-For example:
-
-* Critical system messages receive high priority
-* Navigation messages can receive high priority
-* Normal mode status messages use normal priority
-* Guidance messages can be given lower priority
-
-The speech worker processes queued messages and uses Windows PowerShell Speech Synthesis to produce the audio output.
-
----
-
-## Safety Considerations
-
-Safety is an important part of the SVA design.
-
-The system includes mechanisms for:
-
-* Camera availability checking
-* Camera connection failure detection
-* GPS status monitoring
-* Sensor monitoring
-* System status reporting
-* Obstacle alerts
-* Voice warnings
-* Vibration alerts
-* Guardian monitoring
-
-The project is intended as an assistive prototype and should not be treated as a replacement for established mobility aids or professional assistance.
-
----
-
-## Current Project Scope
-
-The project focuses on:
-
-* AI based object detection
-* OCR based text recognition
-* Pakistani currency recognition
-* Currency counting
-* GPS based navigation
-* Ultrasonic obstacle detection
-* Audio feedback
-* Vibration feedback
-* Bluetooth communication
-* Safety monitoring
-* Guardian monitoring
-
----
-
-## Features Outside the Current Scope
-
-The project documentation does not include:
-
-* Facial recognition
-* Medical diagnosis
-* Fully autonomous navigation
-* Advanced indoor localization
-* Commercial scale deployment
-* Large scale cloud infrastructure
-
----
-
-## Future Enhancements
-
-Possible future improvements include:
-
-* Improved object detection accuracy
-* Faster and more efficient AI models
-* Offline navigation
-* Multi language voice support
-* Customizable voice output
-* Improved battery life
-* Smaller and lighter hardware
-* Advanced indoor navigation
-* Better mapping capabilities
-* Mobile application integration
-* Expanded cloud monitoring
-* Improved guardian and emergency features
-
----
-
-## Limitations
-
-Like any computer vision and embedded assistive system, SVA has practical limitations.
-
-Performance can be affected by:
-
-* Poor lighting
-* Camera positioning
-* Camera failure
-* GPS accuracy
-* Weak network connectivity
-* Hardware failure
-* Battery limitations
-* Processing performance
-* Environmental conditions
-
-AI based predictions should therefore be treated as assistance rather than guaranteed safety decisions.
-
----
-
-## Research and Academic Context
-
-Smart Vision Aid was developed as a Final Year Project with the goal of combining concepts from:
-
-* Artificial Intelligence
-* Computer Vision
-* Natural Language Processing
-* Optical Character Recognition
-* Embedded Systems
-* Internet of Things
-* GPS and navigation
-* Human Computer Interaction
-* Assistive Technology
-
-The project was motivated by the gap between traditional mobility aids and more expensive commercial smart vision systems.
-
-Rather than focusing on a single feature, SVA attempts to bring several assistive functions together into one platform.
-
----
-
-## Project Team
-
-### Final Year Project Team
-
-| Name             | Roll Number  | Main Responsibility |
-| ---------------- | ------------ | ------------------- |
-| Ayesha Naeem     | 22101002 052 | Testing             |
-| Hassan Ahmad Dar | 22101002 073 | Object Detection    |
-| Ahmar Mehmood    | 22101002 079 | Navigation          |
-| Masab Ali        | 22101002 095 | OCR                 |
-
-All team members contributed to research, literature review, development, integration, testing, and documentation according to the project requirements.
-
-### Supervisor
-
-**Miss Sadaf Mehmood**
-
----
-
-## Project Screenshots and Hardware
-
-### Smart Vision Aid Prototype
-
-Place the photograph of the completed smart stick in the repository, for example:
-
-```text
-docs/images/smart-vision-aid.jpg
-```
-
-Then display it here:
-
-![Smart Vision Aid Prototype](docs/images/smart-vision-aid.jpg)
-
-### System Architecture
-
-If the architecture diagram from the project documentation is added to the repository:
-
-```text
-docs/images/system-architecture.png
-```
-
-It can be displayed using:
-
-![System Architecture](docs/images/system-architecture.png)
-
-### Object Detection
-
-```text
-docs/images/object-detection.png
-```
-
-![Object Detection](docs/images/object-detection.png)
-
-### Reading / OCR
-
-```text
-docs/images/ocr.png
-```
-
-![Reading and OCR](docs/images/ocr.png)
-
-### Currency Recognition
-
-```text
-docs/images/currency-recognition.png
-```
-
-![Currency Recognition](docs/images/currency-recognition.png)
-
----
-
-## Getting Started
-
-### Prerequisites
-
-Before running the software, make sure the required hardware and software are available.
-
-Recommended software environment:
-
-* Windows
 * Python 3.x
+* Windows
+* Tesseract OCR
+* Vosk speech recognition model
+* Required Python packages
+* Required YOLO model files
+
+### Hardware
+
 * Camera
 * Microphone
-* Vosk speech recognition model
-* Tesseract OCR
-* Required Python packages
-* YOLO model weights
-
-Hardware dependent features additionally require:
-
+* GPS module for navigation
 * Arduino
-* GPS module
-* Bluetooth module
 * Ultrasonic sensors
+* Bluetooth module
 * Vibration motor
+
+Some features depend on their corresponding hardware components.
 
 ---
 
-## Installation
-
-Clone the repository:
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/Smart-Vision-Aid.git
 cd Smart-Vision-Aid
 ```
 
-Create a virtual environment:
+Replace `YOUR_USERNAME` with your GitHub username.
+
+---
+
+## 2. Create a Virtual Environment
 
 ```bash
 python -m venv venv
 ```
 
-Activate it on Windows:
+Activate the environment on Windows:
 
 ```bash
 venv\Scripts\activate
 ```
 
-Install the required packages:
+---
+
+## 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Make sure the required model files are available in the correct project directories.
+---
 
-The Vosk model should also be placed in the expected `model` directory.
+# Configuration
+
+Some components require additional configuration before running the project.
+
+## Tesseract OCR
+
+Install Tesseract OCR and make sure the executable path matches the configuration used by the project.
+
+The current code uses a Windows based Tesseract path, so this may need to be changed for another computer.
+
+Example:
+
+```python
+pytesseract.pytesseract.tesseract_cmd = r"C:\Path\To\tesseract.exe"
+```
 
 ---
 
-## Configuration
+## Vosk
 
-Some components require local configuration.
+Download and install the required Vosk speech recognition model.
 
-For example:
+Place the model in the directory expected by the project.
 
-### Tesseract OCR
+The Vosk model is required for offline voice command recognition.
 
-The OCR module requires Tesseract OCR to be installed and configured.
+---
 
-The current implementation contains a Windows Tesseract path:
+## YOLO Models
 
-```python
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\hp\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
-```
+The project requires the appropriate YOLO model files.
 
-This path should be changed according to the installation location on the target computer.
+The object detection module uses the YOLOv8 model.
 
-### Firebase
+The currency module uses the project's custom trained currency model.
 
-The Firebase integration requires the appropriate Firebase service account configuration.
+Make sure the model files are placed in the correct locations before starting the application.
 
-Do not upload private credentials such as:
+---
+
+## Firebase
+
+The project includes Firebase based monitoring functionality.
+
+If Firebase monitoring is enabled, the required Firebase configuration and credentials must be provided.
+
+**Do not upload private Firebase credentials or service account files to a public GitHub repository.**
+
+Add sensitive files to `.gitignore`.
+
+Example:
 
 ```text
 serviceAccountKey.json
+.env
 ```
-
-to a public GitHub repository.
-
-Add sensitive files to `.gitignore` instead.
 
 ---
 
-## Running the System
+# Usage
 
-After completing the required configuration, run:
+Start the application using:
 
 ```bash
 python main.py
 ```
 
-The system initializes the microphone and speech recognition model, searches for the external camera, and waits for the activation command.
+After the system starts, use the microphone to provide commands.
 
-Say:
+### Activate the System
 
 ```text
 Activate
 ```
 
-Then select the required mode.
-
-For example:
-
-```text
-Detection mode
-```
-
----
-
-## Example Usage
+The system activates and waits for a mode selection.
 
 ### Object Detection
 
 ```text
-User:
-Activate
-
-SVA:
-Smart Vision Aid activated. Please select your mode.
-
-User:
 Detection mode
-
-SVA:
-Starting object detection.
-
-System:
-Camera → YOLOv8 → Object confirmation → Voice feedback
 ```
 
-### Reading
+The camera starts detecting surrounding objects.
+
+### Reading Mode
 
 ```text
-User:
 Reading mode
-
-SVA:
-Starting reading mode.
-
-System:
-Camera → Quality check → Stable frame → OCR → Text cleaning → Speech
 ```
 
-### Currency
+The system captures a stable document image, performs OCR, cleans the extracted text, and reads the result aloud.
+
+### Currency Mode
 
 ```text
-User:
 Currency mode
-
-SVA:
-Starting currency mode.
-
-System:
-Camera → Currency model → Stable detection → Amount → Running total → Speech
 ```
 
-### Stopping a Mode
+The system recognizes Pakistani banknotes and maintains the running total.
+
+### Stop Current Mode
 
 ```text
-User:
 Stop
+```
 
-SVA:
-Mode stopped. Please select your mode.
+The active module is stopped and the system returns to mode selection.
+
+### Shutdown
+
+```text
+Shutdown
+```
+
+The application exits.
+
+---
+
+# Example Workflows
+
+## Object Detection
+
+```text
+User
+  │
+  │ "Detection mode"
+  ▼
+Camera
+  │
+  ▼
+YOLOv8
+  │
+  ▼
+Object Detection
+  │
+  ▼
+Multi Frame Confirmation
+  │
+  ▼
+Voice Announcement
+```
+
+Example:
+
+```text
+"Person ahead"
 ```
 
 ---
 
-## Design Philosophy
+## Reading
 
-SVA follows a modular design so that each major function can be developed and improved independently.
-
-The system separates:
-
-**Input**
-
-Camera, microphone, GPS, and sensors
-
-**Processing**
-
-AI models, OCR, route processing, and sensor logic
-
-**Output**
-
-Audio, vibration, and monitoring information
-
-This structure makes the project easier to test, debug, and extend.
+```text
+User
+  │
+  │ "Reading mode"
+  ▼
+Camera
+  │
+  ▼
+Stability Check
+  │
+  ▼
+Best Frame
+  │
+  ▼
+Image Preprocessing
+  │
+  ▼
+Tesseract OCR
+  │
+  ▼
+Gemini Text Cleaning
+  │
+  ▼
+Voice Output
+```
 
 ---
 
-## Why Smart Vision Aid?
+## Currency Recognition
 
-The main goal of SVA is not to replace existing mobility aids.
+```text
+User
+  │
+  │ "Currency mode"
+  ▼
+Camera
+  │
+  ▼
+Custom Currency YOLO Model
+  │
+  ▼
+Denomination Detection
+  │
+  ▼
+Stable Detection
+  │
+  ▼
+Amount Added
+  │
+  ▼
+Running Total
+  │
+  ▼
+Voice Output
+```
 
-Instead, it adds an intelligent layer around them.
+---
 
-A traditional white cane can help a user detect a physical obstacle.
+## Route Guidance
 
-SVA aims to provide additional information such as:
+```text
+User
+  │
+  │ Destination
+  ▼
+GPS Location
+  │
+  ▼
+Destination Geocoding
+  │
+  ▼
+Route Calculation
+  │
+  ▼
+Route Processing
+  │
+  ▼
+GPS Tracking
+  │
+  ▼
+Voice Navigation
+```
+
+---
+
+# Safety and Limitations
+
+Smart Vision Aid is an assistive technology prototype and should not be considered a complete replacement for established mobility aids, professional assistance, or independent safety judgment.
+
+System performance can be affected by:
+
+* Poor lighting
+* Camera positioning
+* Camera availability
+* GPS accuracy
+* Network connectivity
+* Hardware limitations
+* Processing performance
+* Environmental conditions
+* AI model accuracy
+
+Camera based AI detection may occasionally produce incorrect or missed detections.
+
+GPS navigation may also become less accurate in areas with weak satellite visibility.
+
+The system should therefore be used as an **assistive tool**, with appropriate safety precautions.
+
+---
+
+# Future Improvements
+
+Future development can include:
+
+* Improved object detection accuracy
+* Better performance in low light conditions
+* Expanded currency recognition
+* Support for additional currencies
+* Offline navigation
+* Multilingual voice commands
+* Improved speech interaction
+* Better hardware integration
+* Smaller and lighter hardware
+* Improved battery efficiency
+* Mobile application integration
+* Improved guardian monitoring
+* Advanced indoor navigation
+* Improved emergency assistance
+
+---
+
+# Project Goals
+
+Smart Vision Aid aims to bring several assistive capabilities together into one platform.
+
+The system is designed to answer practical questions such as:
 
 ```text
 What is around me?
 Can I read this?
 What currency am I holding?
-Where am I going?
-What direction should I take?
+How much money do I have?
+Where am I?
+Where do I need to go?
+Which direction should I take?
 Is there an obstacle nearby?
-Can someone monitor my safety?
 ```
 
-By combining these capabilities, the project aims to improve **mobility, environmental awareness, independence, and safety** for visually impaired users.
+By combining AI, computer vision, OCR, GPS, sensors, and voice interaction, SVA provides a foundation for a more accessible and independent mobility system for visually impaired users.
 
 ---
 
-## Academic Project
+# License
 
-**Project:** Smart Vision Aid (SVA)
+This project was developed as an academic Final Year Project.
 
-**Type:** Final Year Project
-
-**Field:** Computer Science
-
-**Supervisor:** Miss Sadaf Mehmood
-
-**Institution:** University of Sialkot
-
-**Team:**
-
-* Ayesha Naeem
-* Hassan Ahmad Dar
-* Ahmar Mehmood
-* Masab Ali
+For reuse, modification, or distribution, please refer to the license included in this repository.
 
 ---
 
-## License
+# Acknowledgements
 
-This project was developed for academic and research purposes.
+This project makes use of open source technologies and tools from the fields of:
 
-If you plan to reuse, modify, or distribute the project, please contact the project authors and follow the licensing terms included in this repository.
+* Artificial Intelligence
+* Computer Vision
+* Optical Character Recognition
+* Speech Processing
+* GPS and Navigation
+* Embedded Systems
+* Assistive Technology
 
----
-
-## Acknowledgements
-
-The team would like to acknowledge the project supervisor, faculty members, researchers, open source developers, and the communities behind the technologies used in this project.
-
-Special thanks to the developers and maintainers of the open source tools and frameworks that made this project possible.
-
----
-
-## Conclusion
-
-Smart Vision Aid demonstrates how artificial intelligence, computer vision, OCR, GPS, embedded systems, and voice interaction can be combined to create an assistive technology platform.
-
-The project provides a foundation for a more capable and accessible assistive system that can be extended with better AI models, improved hardware, multilingual support, mobile applications, offline navigation, and advanced safety features in the future.
+Special thanks to the developers and communities behind the technologies used in Smart Vision Aid.
